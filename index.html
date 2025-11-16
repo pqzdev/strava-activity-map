@@ -84,12 +84,71 @@
       cursor: not-allowed;
     }
 
+    button.secondary {
+      background: #666;
+    }
+
+    button.secondary:hover {
+      background: #555;
+    }
+
     select, input {
       width: 100%;
       padding: 8px;
       border: 1px solid #ddd;
       border-radius: 4px;
       font-size: 14px;
+    }
+
+    input[type="range"] {
+      padding: 0;
+    }
+
+    .animation-controls {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #ddd;
+    }
+
+    .timeline {
+      margin: 10px 0;
+    }
+
+    .time-display {
+      text-align: center;
+      font-size: 16px;
+      font-weight: 600;
+      color: #fc4c02;
+      margin: 10px 0;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 5px;
+    }
+
+    .button-row button {
+      flex: 1;
+      margin: 0;
+    }
+
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .speed-control label {
+      margin: 0;
+      flex-shrink: 0;
+    }
+
+    .speed-value {
+      min-width: 60px;
+      text-align: right;
+      font-size: 14px;
+      color: #666;
     }
 
     #loading {
@@ -150,7 +209,28 @@
     </div>
 
     <button id="load-btn">Load Activities</button>
-    <button id="animate-btn" disabled>Start Animation</button>
+
+    <div class="animation-controls" id="animation-controls" style="display: none;">
+      <h3 style="font-size: 16px; margin-bottom: 10px;">Animation</h3>
+
+      <div class="time-display" id="time-display">--/--/----</div>
+
+      <div class="timeline">
+        <input type="range" id="timeline-slider" min="0" max="100" value="0" step="0.1">
+      </div>
+
+      <div class="button-row">
+        <button id="play-btn" class="secondary">Play</button>
+        <button id="pause-btn" class="secondary" disabled>Pause</button>
+        <button id="reset-btn" class="secondary">Reset</button>
+      </div>
+
+      <div class="speed-control">
+        <label for="speed-slider">Speed:</label>
+        <input type="range" id="speed-slider" min="1" max="100" value="10" step="1">
+        <span class="speed-value" id="speed-value">10 d/s</span>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>
