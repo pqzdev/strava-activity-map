@@ -36,9 +36,9 @@ npm install
 
 ### 3. Configure Strava API
 
-1. Go to [Strava API Settings](https://www.strava.com/settings/api)
+1. Go to [https://www.strava.com/settings/api](https://www.strava.com/settings/api) to access your API settings
 2. Create an application if you haven't already
-3. Note your **Client ID** and **Client Secret**
+3. Your **Client ID** and **Client Secret** will be displayed on this page
 4. Set the **Authorization Callback Domain** to `localhost`
 
 ### 4. Set up environment variables
