@@ -75,6 +75,22 @@ Open your browser to `http://localhost:5173`
 
 ### Export Animation
 
+#### Via UI (Recommended)
+
+The easiest way to export your animation is through the web interface:
+
+1. Run `npm run dev` and open `http://localhost:5173`
+2. Configure your filters and animation settings in the sidebar
+3. Click the **Export** button in the controls panel
+4. Choose your format (MP4 or GIF) and quality settings
+5. Click **Start Export** to generate and download your animation
+
+The UI provides a live preview and lets you fine-tune settings before exporting.
+
+#### Via Command Line
+
+For automated or scripted exports, you can use the CLI:
+
 ```bash
 npm run export -- --format mp4 --duration 30
 ```
