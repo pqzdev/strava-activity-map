@@ -2,6 +2,8 @@
 
 Visualize and animate your Strava activities on an interactive map over time. Export the animation as a video or GIF.
 
+![Example animation](example.gif)
+
 ## Features
 
 - **Interactive Map Visualization**: View all your activities on a dynamic map
@@ -45,7 +47,6 @@ Create a `.env` file in the project root:
 ```env
 STRAVA_CLIENT_ID=your_client_id
 STRAVA_CLIENT_SECRET=your_client_secret
-MAPBOX_ACCESS_TOKEN=your_mapbox_token
 ```
 
 ### 5. Authenticate with Strava

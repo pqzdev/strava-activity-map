@@ -175,10 +175,18 @@ export class GifExporter {
         ctx.lineTo(points[i].x, points[i].y);
       }
 
-      const color = this._getActivityColor(data.activity.type);
+      // Get the current style from the polyline (includes recency/overlap calculations)
+      const polylineOptions = data.polyline.options;
+      const baseColor = this._getActivityColor(data.activity.type);
+
+      // Use the darken color method from animation controller
+      const activityDate = new Date(data.activity.start_date);
+      const style = this.animationController._calculateStyle(activityDate, coords, this.animationController.currentTime);
+      const color = this.animationController._darkenColor(baseColor, style.recencyScore * 0.3);
+
       ctx.strokeStyle = color;
-      ctx.lineWidth = 3; // Slightly thicker for export
-      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = style.weight * 1.5; // Scale up slightly for export
+      ctx.globalAlpha = style.opacity;
       ctx.stroke();
       drawnCount++;
     });

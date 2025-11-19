@@ -140,8 +140,8 @@ function renderActivities() {
 
     const polyline = L.polyline(coords, {
       color: color,
-      weight: 2,
-      opacity: 0.6
+      weight: 1.5,
+      opacity: 0.5
     }).addTo(map);
 
     // Add popup with activity info

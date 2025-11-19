@@ -26,6 +26,15 @@ export class AnimationController {
     this.fadeoutDuration = 5000; // ms to fade out old activities
     this.maxVisibleActivities = 100; // Limit for performance
 
+    // Opacity settings
+    this.recencyOpacityRange = { min: 0.15, max: 1.0 }; // Most recent = 100%, oldest = 15%
+    this.overlapOpacityRange = { min: 0.15, max: 0.75 }; // Most overlapped = 75%, least = 15%
+    this.fadeWindowMs = 90 * 24 * 60 * 60 * 1000; // 3 months in ms - activities fade over this period
+
+    // Grid for overlap detection (rounded lat/lng to group nearby segments)
+    this.overlapGrid = new Map(); // "lat,lng" -> count
+    this.gridResolution = 0.0005; // ~50m cells
+
     // Callbacks
     this.onTimeUpdate = null;
     this.onActivityAppear = null;
@@ -40,6 +49,112 @@ export class AnimationController {
     this.startTime = new Date(this.sortedActivities[0].start_date);
     this.endTime = new Date(this.sortedActivities[this.sortedActivities.length - 1].start_date);
     this.currentTime = new Date(this.startTime);
+
+    // Pre-calculate overlap grid for all activities
+    this._buildOverlapGrid();
+  }
+
+  /**
+   * Build overlap grid by counting how many activities pass through each cell
+   */
+  _buildOverlapGrid() {
+    this.overlapGrid.clear();
+
+    this.sortedActivities.forEach(activity => {
+      const polylineStr = activity.map?.summary_polyline;
+      if (!polylineStr) return;
+
+      const coords = this._decodePolyline(polylineStr);
+      const visitedCells = new Set(); // Track cells for this activity to avoid double-counting
+
+      coords.forEach(([lat, lng]) => {
+        const cellKey = this._getCellKey(lat, lng);
+        if (!visitedCells.has(cellKey)) {
+          visitedCells.add(cellKey);
+          this.overlapGrid.set(cellKey, (this.overlapGrid.get(cellKey) || 0) + 1);
+        }
+      });
+    });
+
+    // Find max overlap for normalization
+    this.maxOverlap = Math.max(...this.overlapGrid.values(), 1);
+  }
+
+  /**
+   * Get grid cell key for a coordinate
+   */
+  _getCellKey(lat, lng) {
+    const gridLat = Math.round(lat / this.gridResolution) * this.gridResolution;
+    const gridLng = Math.round(lng / this.gridResolution) * this.gridResolution;
+    return `${gridLat.toFixed(4)},${gridLng.toFixed(4)}`;
+  }
+
+  /**
+   * Calculate average overlap score for an activity's route
+   */
+  _getActivityOverlapScore(coords) {
+    if (coords.length === 0) return 0;
+
+    let totalOverlap = 0;
+    const visitedCells = new Set();
+
+    coords.forEach(([lat, lng]) => {
+      const cellKey = this._getCellKey(lat, lng);
+      if (!visitedCells.has(cellKey)) {
+        visitedCells.add(cellKey);
+        totalOverlap += this.overlapGrid.get(cellKey) || 1;
+      }
+    });
+
+    // Average overlap normalized to 0-1
+    const avgOverlap = totalOverlap / visitedCells.size;
+    if (this.maxOverlap <= 1) return 0;
+    return Math.min(1, (avgOverlap - 1) / (this.maxOverlap - 1));
+  }
+
+  /**
+   * Calculate recency score based on current animation time (0 = faded, 1 = recent)
+   */
+  _getRecencyScore(activityDate, currentTime) {
+    const age = currentTime - activityDate;
+    if (age <= 0) return 1;
+    if (age >= this.fadeWindowMs) return 0;
+    return 1 - (age / this.fadeWindowMs);
+  }
+
+  /**
+   * Calculate final opacity and weight based on recency and overlap
+   */
+  _calculateStyle(activityDate, coords, currentTime) {
+    const recencyScore = this._getRecencyScore(activityDate, currentTime);
+    const overlapScore = this._getActivityOverlapScore(coords);
+
+    // Recency: 25% to 100%
+    const recencyOpacity = this.recencyOpacityRange.min +
+      recencyScore * (this.recencyOpacityRange.max - this.recencyOpacityRange.min);
+
+    // Overlap: 25% to 75%
+    const overlapOpacity = this.overlapOpacityRange.min +
+      overlapScore * (this.overlapOpacityRange.max - this.overlapOpacityRange.min);
+
+    // Combine: recency is primary, overlap adds bonus
+    const opacity = Math.min(1, recencyOpacity * 0.7 + overlapOpacity * 0.3);
+
+    // Weight: thicker for recent activities (2.5 -> 1)
+    const weight = 1 + recencyScore * 1.5;
+
+    return { opacity, weight, recencyScore };
+  }
+
+  /**
+   * Darken a color by a percentage
+   */
+  _darkenColor(hex, percent) {
+    const num = parseInt(hex.replace('#', ''), 16);
+    const r = Math.max(0, (num >> 16) * (1 - percent));
+    const g = Math.max(0, ((num >> 8) & 0x00FF) * (1 - percent));
+    const b = Math.max(0, (num & 0x0000FF) * (1 - percent));
+    return `#${((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1)}`;
   }
 
   /**
@@ -155,14 +270,21 @@ export class AnimationController {
       }
     });
 
-    // Update progress of drawing activities
-    this.activePolylines.forEach((data, activityId) => {
+    // Update style of all visible activities based on current time
+    this.activePolylines.forEach((data) => {
       if (data.drawing && data.progress < 1) {
         // Draw instantly - show all completed activities
         data.progress = 1;
         this._updatePolylineProgress(data);
         data.drawing = false;
       }
+
+      // Update style based on current time
+      const activityDate = new Date(data.activity.start_date);
+      const style = this._calculateStyle(activityDate, data.coords, this.currentTime);
+      const baseColor = this._getActivityColor(data.activity.type);
+      const color = this._darkenColor(baseColor, style.recencyScore * 0.3);
+      data.polyline.setStyle({ opacity: style.opacity, weight: style.weight, color: color });
     });
 
     // Note: We keep all activities visible during animation
@@ -179,13 +301,18 @@ export class AnimationController {
     const coords = this._decodePolyline(polylineStr);
     if (coords.length === 0) return;
 
-    const color = this._getActivityColor(activity.type);
+    const baseColor = this._getActivityColor(activity.type);
+    const activityDate = new Date(activity.start_date);
+    const style = this._calculateStyle(activityDate, coords, this.currentTime);
+
+    // Darken color for recent activities (up to 30% darker)
+    const color = this._darkenColor(baseColor, style.recencyScore * 0.3);
 
     // Create polyline - will be drawn immediately
     const polyline = L.polyline(coords, {
       color: color,
-      weight: 2,
-      opacity: 0.7,
+      weight: style.weight,
+      opacity: style.opacity,
       className: 'animated-activity'
     }).addTo(this.map);
 
@@ -233,12 +360,14 @@ export class AnimationController {
         const coords = this._decodePolyline(polylineStr);
         if (coords.length === 0) return;
 
-        const color = this._getActivityColor(activity.type);
+        const baseColor = this._getActivityColor(activity.type);
+        const style = this._calculateStyle(activityDate, coords, time);
+        const color = this._darkenColor(baseColor, style.recencyScore * 0.3);
 
         const polyline = L.polyline(coords, {
           color: color,
-          weight: 2,
-          opacity: 0.6
+          weight: style.weight,
+          opacity: style.opacity
         }).addTo(this.map);
 
         polyline.bindPopup(`
