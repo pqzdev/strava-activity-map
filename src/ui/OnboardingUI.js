@@ -64,23 +64,23 @@ export class OnboardingUI {
       <div class="onboarding-overlay">
         <div class="onboarding-modal">
           <div class="onboarding-header">
-            <h1>🗺️ Strava Activity Map</h1>
+            <h1><i class="fas fa-map-marked-alt"></i> Strava Activity Map</h1>
             <p>Visualize and export your Strava activities as animated GIFs</p>
           </div>
 
           <!-- Step 1: Welcome & Privacy -->
           <div class="onboarding-step" data-step="1">
-            <h2>Welcome! 👋</h2>
+            <h2>Welcome! <i class="fas fa-hand-wave"></i></h2>
             <p>This tool visualizes your Strava activities on a map and exports them as animated GIFs.</p>
 
             <div class="privacy-notice">
-              <h3>🔒 Privacy First</h3>
+              <h3><i class="fas fa-lock"></i> Privacy First</h3>
               <ul>
-                <li>✅ <strong>100% client-side</strong> - runs entirely in your browser</li>
-                <li>✅ <strong>No data sent to our servers</strong> - we don't have any servers!</li>
-                <li>✅ <strong>Your credentials stay with you</strong> - stored only in your browser session</li>
-                <li>✅ <strong>Use your own API quota</strong> - no shared limits</li>
-                <li>✅ <strong>Auto-clears on browser close</strong> - nothing persists</li>
+                <li><i class="fas fa-check-circle" style="color: #0066cc;"></i> <strong>100% client-side</strong> - runs entirely in your browser</li>
+                <li><i class="fas fa-check-circle" style="color: #0066cc;"></i> <strong>No data sent to our servers</strong> - we don't have any servers!</li>
+                <li><i class="fas fa-check-circle" style="color: #0066cc;"></i> <strong>Your credentials stay with you</strong> - stored only in your browser session</li>
+                <li><i class="fas fa-check-circle" style="color: #0066cc;"></i> <strong>Use your own API quota</strong> - no shared limits</li>
+                <li><i class="fas fa-check-circle" style="color: #0066cc;"></i> <strong>Auto-clears on browser close</strong> - nothing persists</li>
               </ul>
             </div>
 
@@ -116,7 +116,7 @@ export class OnboardingUI {
                 <li>Click "Create"</li>
                 <li>You'll see your <strong>Client ID</strong> and <strong>Client Secret</strong></li>
               </ol>
-              <p><small><strong>⏱️ This takes about 1 minute!</strong> Strava's API setup is quick and easy.</small></p>
+              <p><small><strong><i class="fas fa-clock"></i> This takes about 1 minute!</strong> Strava's API setup is quick and easy.</small></p>
             </div>
 
             <div class="button-row">
@@ -141,6 +141,28 @@ export class OnboardingUI {
               <small>These are stored only in your browser session</small>
             </div>
 
+            <div class="form-group">
+              <label>Privacy Settings</label>
+              <div style="margin: 10px 0;">
+                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer;">
+                  <input type="radio" name="privacy-scope" value="read" checked />
+                  <div>
+                    <strong>Public activities only</strong>
+                    <small style="display: block; color: #666; margin-top: 2px;">Only activities you've marked as public will appear on the map</small>
+                  </div>
+                </label>
+              </div>
+              <div style="margin: 10px 0;">
+                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer;">
+                  <input type="radio" name="privacy-scope" value="read_all" />
+                  <div>
+                    <strong>Include private activities</strong>
+                    <small style="display: block; color: #666; margin-top: 2px;"><i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Private activities will be visible on the exported map</small>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div id="credentials-error" class="error-message" style="display: none;"></div>
 
             <div class="button-row">
@@ -162,7 +184,7 @@ export class OnboardingUI {
                 <li>Copy the <strong>entire URL</strong> from your browser's address bar</li>
                 <li>Paste it below (we'll extract the code automatically)</li>
               </ol>
-              <p><small><strong>💡 Tip:</strong> Just paste the whole URL - you don't need to find the code yourself!</small></p>
+              <p><small><strong><i class="fas fa-lightbulb" style="color: #ffc107;"></i> Tip:</strong> Just paste the whole URL - you don't need to find the code yourself!</small></p>
             </div>
 
             <button class="btn-primary" onclick="onboarding.openAuthWindow()" style="margin-bottom: 20px;">
@@ -193,7 +215,7 @@ export class OnboardingUI {
             <p id="athlete-welcome"></p>
 
             <div class="cache-info" id="cache-info" style="display: none;">
-              <p>✅ Found cached activities: <strong id="cached-count">0</strong> activities</p>
+              <p><i class="fas fa-check-circle" style="color: #4caf50;"></i> Found cached activities: <strong id="cached-count">0</strong> activities</p>
               <p>Cached <span id="cache-age">0</span> minutes ago</p>
               <button class="btn-secondary" onclick="onboarding.clearCache()">Clear & Re-fetch</button>
             </div>
@@ -291,6 +313,7 @@ export class OnboardingUI {
   saveCredentialsAndShowAuth() {
     const clientId = document.getElementById('client-id').value.trim();
     const clientSecret = document.getElementById('client-secret').value.trim();
+    const scope = document.querySelector('input[name="privacy-scope"]:checked').value;
     const errorEl = document.getElementById('credentials-error');
 
     // Validate
@@ -307,8 +330,8 @@ export class OnboardingUI {
       return;
     }
 
-    // Save credentials
-    this.auth.saveCredentials(clientId, clientSecret);
+    // Save credentials and scope preference
+    this.auth.saveCredentials(clientId, clientSecret, scope);
 
     // Show manual auth step
     this.showStep(4);
@@ -388,8 +411,8 @@ export class OnboardingUI {
     // Show athlete info
     const athlete = this.auth.getAthlete();
     if (athlete) {
-      document.getElementById('athlete-welcome').textContent =
-        `Welcome, ${athlete.firstname} ${athlete.lastname}! 🎉`;
+      document.getElementById('athlete-welcome').innerHTML =
+        `Welcome, ${athlete.firstname} ${athlete.lastname}! <i class="fas fa-party-horn" style="color: #fc4c02;"></i>`;
     }
 
     // Check for cached activities
@@ -402,7 +425,7 @@ export class OnboardingUI {
       // Hide fetch controls, show use cached button
       const fetchControls = document.getElementById('fetch-controls');
       fetchControls.innerHTML = `
-        <p>✅ You have cached activities ready to use!</p>
+        <p><i class="fas fa-check-circle" style="color: #4caf50;"></i> You have cached activities ready to use!</p>
         <button class="btn-primary" onclick="onboarding.useCachedActivities()">
           Use Cached Activities (${cacheInfo.count})
         </button>

@@ -8,6 +8,7 @@ export class StravaAuth {
     this.storageKeys = {
       clientId: 'strava_client_id',
       clientSecret: 'strava_client_secret',
+      scope: 'strava_scope',
       accessToken: 'strava_access_token',
       refreshToken: 'strava_refresh_token',
       expiresAt: 'strava_expires_at',
@@ -38,11 +39,12 @@ export class StravaAuth {
   }
 
   /**
-   * Save API credentials (Client ID and Secret)
+   * Save API credentials (Client ID, Secret, and Scope)
    */
-  saveCredentials(clientId, clientSecret) {
+  saveCredentials(clientId, clientSecret, scope = 'read') {
     sessionStorage.setItem(this.storageKeys.clientId, clientId);
     sessionStorage.setItem(this.storageKeys.clientSecret, clientSecret);
+    sessionStorage.setItem(this.storageKeys.scope, scope);
   }
 
   /**
@@ -65,16 +67,19 @@ export class StravaAuth {
       throw new Error('Client ID not set. Please enter your credentials first.');
     }
 
+    // Get scope preference (read or read_all)
+    const scopeType = sessionStorage.getItem(this.storageKeys.scope) || 'read';
+    const scopePermissions = scopeType === 'read_all' ? 'read,activity:read_all' : 'read,activity:read';
+
     // Use a localhost URL that won't work - user will copy code from the error page
     const redirectUri = 'http://localhost:9999/exchange_token';
-    const scope = 'read,activity:read_all';
 
     const authUrl = `https://www.strava.com/oauth/authorize?` +
       `client_id=${clientId}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=code&` +
       `approval_prompt=force&` + // Always show auth screen
-      `scope=${scope}`;
+      `scope=${scopePermissions}`;
 
     return authUrl;
   }

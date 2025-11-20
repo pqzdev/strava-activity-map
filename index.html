@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Strava Activity Map</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <style>
     * {
       margin: 0;
@@ -26,12 +28,15 @@
       position: absolute;
       top: 20px;
       left: 20px;
+      bottom: 20px;
       background: white;
       padding: 20px;
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       z-index: 1000;
       max-width: 300px;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     #controls h2 {
@@ -102,6 +107,24 @@
 
     input[type="range"] {
       padding: 0;
+    }
+
+    .collapsible-section {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #ddd;
+    }
+
+    .collapsible-section summary {
+      cursor: pointer;
+      font-weight: 600;
+      margin-bottom: 10px;
+      user-select: none;
+      font-size: 16px;
+    }
+
+    .collapsible-section[open] summary {
+      margin-bottom: 15px;
     }
 
     .animation-controls {
@@ -230,11 +253,7 @@
   <div id="map"></div>
 
   <div id="controls">
-    <h2>Strava Activity Map</h2>
-
-    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 8px; margin-bottom: 15px; font-size: 11px; text-align: center; color: #856404;">
-      <strong>Note:</strong> Not affiliated with Strava, Inc.
-    </div>
+    <h2><i class="fas fa-map-marked-alt"></i> Strava Activity Map</h2>
 
     <div id="activity-stats">
       <div><strong>Activities:</strong> <span id="stat-count">0</span></div>
@@ -243,16 +262,29 @@
     </div>
 
     <div class="control-group">
-      <label for="activity-type">Activity Type</label>
-      <select id="activity-type">
-        <option value="all">All Activities</option>
-      </select>
+      <label>Activity Types</label>
+      <div class="activity-type-filter">
+        <div style="margin-bottom: 8px;">
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: normal;">
+            <input type="checkbox" id="activity-type-all" checked>
+            <span>All Activities</span>
+          </label>
+        </div>
+        <div id="activity-type-list" style="margin-left: 20px; display: none;"></div>
+      </div>
     </div>
+
+    <details class="collapsible-section">
+      <summary style="cursor: pointer; font-weight: 600; margin-bottom: 10px; user-select: none;">Color Schemes</summary>
+      <div id="color-schemes-list" style="margin-left: 10px;">
+        <!-- Populated dynamically -->
+      </div>
+    </details>
 
     <button id="load-btn">Get Started</button>
 
-    <div class="animation-controls" id="animation-controls" style="display: none;">
-      <h3 style="font-size: 16px; margin-bottom: 10px;">Animation</h3>
+    <details class="collapsible-section" id="animation-controls" style="display: none;" open>
+      <summary>Animation</summary>
 
       <div class="time-display" id="time-display">--/--/----</div>
 
@@ -271,10 +303,10 @@
         <input type="range" id="speed-slider" min="1" max="100" value="10" step="1">
         <span class="speed-value" id="speed-value">10 d/s</span>
       </div>
-    </div>
+    </details>
 
-    <div class="export-controls" id="export-controls" style="display: none;">
-      <h3 style="font-size: 16px; margin-bottom: 10px;">Export GIF</h3>
+    <details class="collapsible-section" id="export-controls" style="display: none;">
+      <summary>Export GIF</summary>
 
       <div class="control-group">
         <label for="export-start-date">Start Date</label>
@@ -328,6 +360,10 @@
       </div>
 
       <button id="export-btn">Export GIF</button>
+    </details>
+
+    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 10px; text-align: center; color: #999;">
+      Not affiliated with Strava, Inc.
     </div>
   </div>
 

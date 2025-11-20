@@ -39,7 +39,8 @@ const ACTIVITY_COLORS = {
 // DOM elements
 const loadingEl = document.getElementById('loading');
 const loadBtn = document.getElementById('load-btn');
-const activityTypeSelect = document.getElementById('activity-type');
+const activityTypeAll = document.getElementById('activity-type-all');
+const activityTypeList = document.getElementById('activity-type-list');
 const statCount = document.getElementById('stat-count');
 const statDistance = document.getElementById('stat-distance');
 const statTypes = document.getElementById('stat-types');
@@ -190,15 +191,68 @@ function updateStats() {
 function populateActivityTypes() {
   const types = [...new Set(activities.map(a => a.type))].sort();
 
-  // Clear existing options (except "All Activities")
-  activityTypeSelect.innerHTML = '<option value="all">All Activities</option>';
+  // Clear existing checkboxes
+  activityTypeList.innerHTML = '';
 
+  // Create checkbox for each activity type
   types.forEach(type => {
-    const option = document.createElement('option');
-    option.value = type;
-    option.textContent = type;
-    activityTypeSelect.appendChild(option);
+    const div = document.createElement('div');
+    div.style.marginBottom = '6px';
+
+    const label = document.createElement('label');
+    label.style.display = 'flex';
+    label.style.alignItems = 'center';
+    label.style.gap = '6px';
+    label.style.cursor = 'pointer';
+    label.style.fontWeight = 'normal';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'activity-type-checkbox';
+    checkbox.value = type;
+    checkbox.checked = true; // All types selected by default
+    checkbox.addEventListener('change', handleActivityTypeChange);
+
+    const span = document.createElement('span');
+    span.textContent = type;
+
+    label.appendChild(checkbox);
+    label.appendChild(span);
+    div.appendChild(label);
+    activityTypeList.appendChild(div);
   });
+
+  // Show the list
+  activityTypeList.style.display = 'block';
+}
+
+// Get selected activity types
+function getSelectedActivityTypes() {
+  if (activityTypeAll.checked) {
+    return 'all';
+  }
+
+  const checkboxes = document.querySelectorAll('.activity-type-checkbox:checked');
+  return Array.from(checkboxes).map(cb => cb.value);
+}
+
+// Handle activity type checkbox changes
+function handleActivityTypeChange() {
+  const checkboxes = document.querySelectorAll('.activity-type-checkbox');
+  const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+
+  // If no individual types are checked, check "All Activities"
+  if (!anyChecked) {
+    activityTypeAll.checked = true;
+    activityTypeList.style.display = 'none';
+  }
+
+  // Re-render activities with new filter
+  if (animationController) {
+    initializeAnimation();
+  } else {
+    renderActivities();
+  }
 }
 
 function renderActivities() {
@@ -206,11 +260,11 @@ function renderActivities() {
   polylines.forEach(p => p.remove());
   polylines = [];
 
-  // Filter activities
-  const selectedType = activityTypeSelect.value;
-  const filtered = selectedType === 'all'
+  // Filter activities based on selected types
+  const selectedTypes = getSelectedActivityTypes();
+  const filtered = selectedTypes === 'all'
     ? activities
-    : activities.filter(a => a.type === selectedType);
+    : activities.filter(a => selectedTypes.includes(a.type));
 
   // Render each activity
   filtered.forEach(activity => {
@@ -244,11 +298,11 @@ function renderActivities() {
 
 // Initialize animation
 function initializeAnimation() {
-  // Filter activities based on selected type
-  const selectedType = activityTypeSelect.value;
-  const filtered = selectedType === 'all'
+  // Filter activities based on selected types
+  const selectedTypes = getSelectedActivityTypes();
+  const filtered = selectedTypes === 'all'
     ? activities
-    : activities.filter(a => a.type === selectedType);
+    : activities.filter(a => selectedTypes.includes(a.type));
 
   // Clear existing animation
   if (animationController) {
@@ -340,8 +394,23 @@ loadBtn.addEventListener('click', () => {
   showOnboarding();
 });
 
-activityTypeSelect.addEventListener('change', () => {
-  if (activities.length > 0) {
+// "All Activities" checkbox handler
+activityTypeAll.addEventListener('change', () => {
+  const checkboxes = document.querySelectorAll('.activity-type-checkbox');
+
+  if (activityTypeAll.checked) {
+    // Hide individual checkboxes
+    activityTypeList.style.display = 'none';
+    // Uncheck all individual types
+    checkboxes.forEach(cb => cb.checked = false);
+  } else {
+    // Show individual checkboxes and select all
+    activityTypeList.style.display = 'block';
+    checkboxes.forEach(cb => cb.checked = true);
+  }
+
+  // Re-render
+  if (animationController) {
     initializeAnimation();
   } else {
     renderActivities();
