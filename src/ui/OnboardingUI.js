@@ -39,28 +39,18 @@ export class OnboardingUI {
 
   /**
    * Get the correct domain for OAuth callback
+   * Always use localhost since users configure their own Strava API apps
    */
   getCallbackDomain() {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return hostname;
-    } else {
-      // Always use production domain, even on preview deployments
-      return 'strava-gif.pages.dev';
-    }
+    return 'localhost';
   }
 
   /**
    * Get the correct website URL for OAuth
+   * Always use localhost since users configure their own Strava API apps
    */
   getWebsiteURL() {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return window.location.origin;
-    } else {
-      // Always use production URL, even on preview deployments
-      return 'https://strava-gif.pages.dev';
-    }
+    return `http://localhost:${window.location.port || 5173}`;
   }
 
   /**

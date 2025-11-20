@@ -64,20 +64,9 @@ export class StravaAuth {
       throw new Error('Client ID not set. Please enter your credentials first.');
     }
 
-    // Determine redirect URI based on environment
-    let redirectUri;
-
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      // Local development - use localhost with port
-      redirectUri = `http://localhost:${window.location.port}`;
-    } else if (window.location.hostname === 'strava-gif.pages.dev') {
-      // Production domain - always use production URL (not preview deployments)
-      redirectUri = 'https://strava-gif.pages.dev';
-    } else {
-      // Fallback for other domains or preview deployments
-      // This will redirect to production after OAuth
-      redirectUri = 'https://strava-gif.pages.dev';
-    }
+    // Always use localhost for OAuth redirect
+    // Users configure their own Strava API app with localhost callback
+    const redirectUri = `http://localhost:${window.location.port || 5173}`;
 
     const scope = 'read,activity:read_all';
 
