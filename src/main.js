@@ -363,6 +363,24 @@ function getSelectedActivityTypes() {
   return Array.from(checkboxes).map(cb => cb.value);
 }
 
+// Get filtered activities based on type and privacy settings
+function getFilteredActivities() {
+  // Filter by activity type
+  const selectedTypes = getSelectedActivityTypes();
+  let filtered = selectedTypes === 'all'
+    ? activities
+    : activities.filter(a => selectedTypes.includes(a.type));
+
+  // Filter by privacy setting
+  const includePrivateCheckbox = document.getElementById('include-private-activities');
+  if (includePrivateCheckbox && !includePrivateCheckbox.checked) {
+    // Filter out private activities
+    filtered = filtered.filter(a => !a.private);
+  }
+
+  return filtered;
+}
+
 // Handle activity type checkbox changes
 function handleActivityTypeChange() {
   const checkboxes = document.querySelectorAll('.activity-type-checkbox');
@@ -393,11 +411,8 @@ function renderActivities() {
   polylines.forEach(p => p.remove());
   polylines = [];
 
-  // Filter activities based on selected types
-  const selectedTypes = getSelectedActivityTypes();
-  const filtered = selectedTypes === 'all'
-    ? activities
-    : activities.filter(a => selectedTypes.includes(a.type));
+  // Filter activities based on selected types and privacy settings
+  const filtered = getFilteredActivities();
 
   // Render each activity
   filtered.forEach(activity => {
@@ -432,11 +447,8 @@ function renderActivities() {
 
 // Initialize animation
 function initializeAnimation() {
-  // Filter activities based on selected types
-  const selectedTypes = getSelectedActivityTypes();
-  const filtered = selectedTypes === 'all'
-    ? activities
-    : activities.filter(a => selectedTypes.includes(a.type));
+  // Filter activities based on selected types and privacy settings
+  const filtered = getFilteredActivities();
 
   // Clear existing animation
   if (animationController) {
@@ -654,6 +666,19 @@ activityTypeAll.parentElement.addEventListener('click', (e) => {
     renderActivities();
   }
 });
+
+// "Include private activities" checkbox handler
+const includePrivateCheckbox = document.getElementById('include-private-activities');
+if (includePrivateCheckbox) {
+  includePrivateCheckbox.addEventListener('change', () => {
+    // Re-render with new privacy filter
+    if (animationController) {
+      initializeAnimation();
+    } else {
+      renderActivities();
+    }
+  });
+}
 
 // Animation controls
 playBtn.addEventListener('click', () => {

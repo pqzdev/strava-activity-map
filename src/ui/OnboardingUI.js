@@ -163,12 +163,18 @@ export class OnboardingUI {
               <p><strong>Follow these steps:</strong></p>
               <ol>
                 <li>Click the button below to open Strava authorization in a new tab</li>
+                <li><strong>Important:</strong> On the Strava page, make sure to check <strong>BOTH permission boxes</strong>:
+                  <ul style="margin: 8px 0;">
+                    <li>"View data about your activities"</li>
+                    <li>"View data about your private activities"</li>
+                  </ul>
+                </li>
                 <li>Click "Authorize" on the Strava page</li>
                 <li>You'll see an error page - <strong>that's expected!</strong></li>
                 <li>Copy the <strong>entire URL</strong> from your browser's address bar</li>
                 <li>Paste it below (we'll extract the code automatically)</li>
               </ol>
-              <p><small><strong><i class="fas fa-lightbulb" style="color: #ffc107;"></i> Tip:</strong> Just paste the whole URL - you don't need to find the code yourself!</small></p>
+              <p><small><strong><i class="fas fa-info-circle" style="color: #2196f3;"></i> Privacy Note:</strong> Your activities are only shared with your own API - no one else can access them. You can control whether private activities appear on your map using the "Include private activities" checkbox in the app.</small></p>
             </div>
 
             <button class="btn-primary" onclick="onboarding.openAuthWindow()" style="margin-bottom: 20px;">
@@ -367,14 +373,18 @@ export class OnboardingUI {
         const scopeMatch = input.match(/scope=([^&]+)/);
         if (scopeMatch && scopeMatch[1]) {
           const scopeString = decodeURIComponent(scopeMatch[1]);
-          // Check if user granted read_all (private activities access)
+          // Check if user granted read_all (private activities access) - this is REQUIRED
           if (scopeString.includes('activity:read_all')) {
             grantedScope = 'read_all';
-          } else if (scopeString.includes('activity:read')) {
-            grantedScope = 'read'; // Public activities only
           } else {
-            // User denied activity access entirely - this won't work
-            errorEl.textContent = 'You need to grant access to view activities. Please click "Open Strava Authorization" and accept the activity permissions.';
+            // User didn't grant activity:read_all - this won't work with Strava's API
+            errorEl.innerHTML = `
+              <strong>Missing Required Permission</strong><br><br>
+              You need to grant access to <strong>private activities</strong> for this app to work.<br><br>
+              <strong>Important:</strong> Your activities are only shared with your own API - no one else can see them.
+              You can control whether private activities appear on your map using the "Include private activities" checkbox in the app.<br><br>
+              Please click "Open Strava Authorization" again and make sure to check <strong>both</strong> permission boxes on Strava's page.
+            `;
             errorEl.style.display = 'block';
             return;
           }
