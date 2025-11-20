@@ -51,17 +51,17 @@ User enters their Client ID and Client Secret in the app.
 - Browser tries to redirect to `http://localhost:9999/exchange_token?code=ABC123...`
 - Shows error page (localhost:9999 not running - that's OK!)
 
-**Copy the code:**
+**Copy the entire URL:**
 ```
 URL: http://localhost:9999/exchange_token?code=1a2b3c4d5e6f7g8h9i0j&scope=read,activity:read_all
-                                              ^^^^^^^^^^^^^^^^^^^^
-                                              Copy this part!
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     Copy the whole thing!
 ```
 
 **Back in the app:**
-- Paste the code
+- Paste the entire URL
 - Click "Continue"
-- App exchanges code for access token
+- App automatically extracts the code and exchanges it for access token
 - Success!
 
 ---
@@ -243,21 +243,21 @@ Copy everything between `code=` and `&scope` (or end of URL if no `&`).
 
 ## Future Improvements
 
-### Optional: Add URL Parser
+### ✅ URL Parser (Implemented!)
 
-We could add a button to auto-extract the code from the pasted URL:
+The app now automatically extracts the authorization code from the full URL! Users can paste the entire URL and we'll parse it for them:
 
 ```javascript
-function extractCodeFromUrl() {
-  const url = prompt('Paste the entire URL from the error page:');
-  const match = url.match(/code=([^&]+)/);
-  if (match) {
-    document.getElementById('auth-code').value = match[1];
+// Already implemented in OnboardingUI.js
+if (input.includes('code=')) {
+  const match = input.match(/code=([^&]+)/);
+  if (match && match[1]) {
+    code = match[1];
   }
 }
 ```
 
-This would let users paste the whole URL instead of just the code.
+This makes the flow even easier - no need to find the code manually!
 
 ### Optional: Add QR Code
 

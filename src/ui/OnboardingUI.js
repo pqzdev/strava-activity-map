@@ -158,12 +158,11 @@ export class OnboardingUI {
               <ol>
                 <li>Click the button below to open Strava authorization in a new tab</li>
                 <li>Click "Authorize" on the Strava page</li>
-                <li>You'll see an error page - that's OK!</li>
-                <li>Look at the URL in your browser address bar</li>
-                <li>Find the <code>code=</code> parameter in the URL</li>
-                <li>Copy everything after <code>code=</code> (up to the next <code>&</code> or end of URL)</li>
-                <li>Paste the code below</li>
+                <li>You'll see an error page - <strong>that's expected!</strong></li>
+                <li>Copy the <strong>entire URL</strong> from your browser's address bar</li>
+                <li>Paste it below (we'll extract the code automatically)</li>
               </ol>
+              <p><small><strong>💡 Tip:</strong> Just paste the whole URL - you don't need to find the code yourself!</small></p>
             </div>
 
             <button class="btn-primary" onclick="onboarding.openAuthWindow()" style="margin-bottom: 20px;">
@@ -171,9 +170,9 @@ export class OnboardingUI {
             </button>
 
             <div class="form-group">
-              <label for="auth-code">Authorization Code</label>
-              <input type="text" id="auth-code" placeholder="Paste the code from the URL here" />
-              <small>Example: If URL is <code>http://localhost:9999/exchange_token?code=abc123...</code>, paste <code>abc123...</code></small>
+              <label for="auth-code">Paste the URL from the Error Page</label>
+              <input type="text" id="auth-code" placeholder="Paste the entire URL here (e.g., http://localhost:9999/exchange_token?code=...)" />
+              <small>Just copy-paste the full URL from your address bar - we'll handle the rest!</small>
             </div>
 
             <div id="auth-error" class="error-message" style="display: none;"></div>
@@ -331,14 +330,36 @@ export class OnboardingUI {
    * Exchange authorization code for token
    */
   async exchangeAuthCode() {
-    const code = document.getElementById('auth-code').value.trim();
+    const input = document.getElementById('auth-code').value.trim();
     const errorEl = document.getElementById('auth-error');
     const progressEl = document.getElementById('auth-progress');
 
-    if (!code) {
-      errorEl.textContent = 'Please paste the authorization code';
+    if (!input) {
+      errorEl.textContent = 'Please paste the URL or authorization code';
       errorEl.style.display = 'block';
       return;
+    }
+
+    // Try to extract code from URL if full URL was pasted
+    let code = input;
+
+    // Check if input looks like a URL
+    if (input.includes('code=')) {
+      try {
+        // Extract code parameter from URL
+        const match = input.match(/code=([^&]+)/);
+        if (match && match[1]) {
+          code = match[1];
+        } else {
+          errorEl.textContent = 'Could not find authorization code in URL. Please paste the full URL from the error page.';
+          errorEl.style.display = 'block';
+          return;
+        }
+      } catch (e) {
+        errorEl.textContent = 'Could not parse URL. Please paste the full URL from the error page.';
+        errorEl.style.display = 'block';
+        return;
+      }
     }
 
     try {
