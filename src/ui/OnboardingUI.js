@@ -39,18 +39,18 @@ export class OnboardingUI {
 
   /**
    * Get the correct domain for OAuth callback
-   * Always use localhost since users configure their own Strava API apps
+   * For manual OAuth flow, we use a dummy localhost URL
    */
   getCallbackDomain() {
-    return 'localhost';
+    return 'localhost:9999';
   }
 
   /**
    * Get the correct website URL for OAuth
-   * Always use localhost since users configure their own Strava API apps
+   * For manual OAuth flow, we use a dummy localhost URL
    */
   getWebsiteURL() {
-    return `http://localhost:${window.location.port || 5173}`;
+    return 'http://localhost:9999';
   }
 
   /**
