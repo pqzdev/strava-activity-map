@@ -56,29 +56,63 @@ export class StravaAuth {
   }
 
   /**
-   * Start OAuth flow - redirect to Strava authorization
+   * Get OAuth authorization URL for manual flow
+   * User opens this in new tab, authorizes, and copies the code
    */
-  authorize() {
+  getAuthorizationUrl() {
     const { clientId } = this.getCredentials();
     if (!clientId) {
       throw new Error('Client ID not set. Please enter your credentials first.');
     }
 
-    // Always use localhost for OAuth redirect
-    // Users configure their own Strava API app with localhost callback
-    const redirectUri = `http://localhost:${window.location.port || 5173}`;
-
+    // Use a localhost URL that won't work - user will copy code from the error page
+    const redirectUri = 'http://localhost:9999/exchange_token';
     const scope = 'read,activity:read_all';
 
     const authUrl = `https://www.strava.com/oauth/authorize?` +
       `client_id=${clientId}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=code&` +
-      `approval_prompt=auto&` +
+      `approval_prompt=force&` + // Always show auth screen
       `scope=${scope}`;
 
-    console.log('OAuth redirect URI:', redirectUri);
-    window.location.href = authUrl;
+    return authUrl;
+  }
+
+  /**
+   * Exchange authorization code for access token
+   */
+  async exchangeCode(code) {
+    const { clientId, clientSecret } = this.getCredentials();
+    if (!clientId || !clientSecret) {
+      throw new Error('Credentials not found in session');
+    }
+
+    // Exchange code for token
+    const response = await fetch('https://www.strava.com/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code: code,
+        grant_type: 'authorization_code'
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Token exchange failed: ${errorData.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    // Store tokens and athlete info
+    this.saveTokens(data);
+
+    return data;
   }
 
   /**

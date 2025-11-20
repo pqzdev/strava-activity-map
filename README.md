@@ -6,6 +6,8 @@ Visualize and animate your Strava activities on an interactive map. Export beaut
 
 **🌍 Live Demo**: [https://strava-gif.pages.dev](https://strava-gif.pages.dev)
 
+**⚠️ Disclaimer**: This project is not affiliated with, endorsed by, or connected to Strava, Inc. in any way. This is an independent, open-source visualization tool that uses the public Strava API.
+
 ![Example animation](example.gif)
 
 ## ✨ Features

@@ -84,6 +84,10 @@ export class OnboardingUI {
               </ul>
             </div>
 
+            <div class="disclaimer-notice">
+              <p><small><strong>Disclaimer:</strong> This project is not affiliated with, endorsed by, or connected to Strava, Inc. in any way. This is an independent, open-source visualization tool that uses the public Strava API.</small></p>
+            </div>
+
             <button class="btn-primary" onclick="onboarding.nextStep()">Get Started</button>
           </div>
 
@@ -141,15 +145,47 @@ export class OnboardingUI {
 
             <div class="button-row">
               <button class="btn-secondary" onclick="onboarding.prevStep()">Back</button>
-              <button class="btn-primary" onclick="onboarding.saveCredentials()">Save & Authorize</button>
+              <button class="btn-primary" onclick="onboarding.saveCredentialsAndShowAuth()">Next</button>
             </div>
           </div>
 
-          <!-- Step 4: Authorizing -->
+          <!-- Step 4: Manual Authorization -->
           <div class="onboarding-step" data-step="4" style="display: none;">
-            <h2>Authorizing...</h2>
-            <div class="spinner"></div>
-            <p>Redirecting to Strava for authorization...</p>
+            <h2>Step 3: Authorize with Strava</h2>
+
+            <div class="instructions">
+              <p><strong>Follow these steps:</strong></p>
+              <ol>
+                <li>Click the button below to open Strava authorization in a new tab</li>
+                <li>Click "Authorize" on the Strava page</li>
+                <li>You'll see an error page - that's OK!</li>
+                <li>Look at the URL in your browser address bar</li>
+                <li>Find the <code>code=</code> parameter in the URL</li>
+                <li>Copy everything after <code>code=</code> (up to the next <code>&</code> or end of URL)</li>
+                <li>Paste the code below</li>
+              </ol>
+            </div>
+
+            <button class="btn-primary" onclick="onboarding.openAuthWindow()" style="margin-bottom: 20px;">
+              Open Strava Authorization
+            </button>
+
+            <div class="form-group">
+              <label for="auth-code">Authorization Code</label>
+              <input type="text" id="auth-code" placeholder="Paste the code from the URL here" />
+              <small>Example: If URL is <code>http://localhost:9999/exchange_token?code=abc123...</code>, paste <code>abc123...</code></small>
+            </div>
+
+            <div id="auth-error" class="error-message" style="display: none;"></div>
+            <div id="auth-progress" style="display: none; text-align: center; margin: 15px 0;">
+              <div class="spinner"></div>
+              <p>Exchanging code for access token...</p>
+            </div>
+
+            <div class="button-row">
+              <button class="btn-secondary" onclick="onboarding.prevStep()">Back</button>
+              <button class="btn-primary" onclick="onboarding.exchangeAuthCode()">Continue</button>
+            </div>
           </div>
 
           <!-- Step 5: Fetch Activities -->
@@ -251,9 +287,9 @@ export class OnboardingUI {
   }
 
   /**
-   * Save credentials and start OAuth flow
+   * Save credentials and show auth step
    */
-  saveCredentials() {
+  saveCredentialsAndShowAuth() {
     const clientId = document.getElementById('client-id').value.trim();
     const clientSecret = document.getElementById('client-secret').value.trim();
     const errorEl = document.getElementById('credentials-error');
@@ -275,13 +311,53 @@ export class OnboardingUI {
     // Save credentials
     this.auth.saveCredentials(clientId, clientSecret);
 
-    // Show authorizing step
+    // Show manual auth step
     this.showStep(4);
+  }
 
-    // Start OAuth flow (will redirect)
-    setTimeout(() => {
-      this.auth.authorize();
-    }, 1000);
+  /**
+   * Open Strava authorization in new window
+   */
+  openAuthWindow() {
+    try {
+      const authUrl = this.auth.getAuthorizationUrl();
+      window.open(authUrl, '_blank');
+    } catch (error) {
+      alert(`Error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Exchange authorization code for token
+   */
+  async exchangeAuthCode() {
+    const code = document.getElementById('auth-code').value.trim();
+    const errorEl = document.getElementById('auth-error');
+    const progressEl = document.getElementById('auth-progress');
+
+    if (!code) {
+      errorEl.textContent = 'Please paste the authorization code';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    try {
+      errorEl.style.display = 'none';
+      progressEl.style.display = 'block';
+
+      // Exchange code for token
+      await this.auth.exchangeCode(code);
+
+      // Success! Move to fetch activities step
+      progressEl.style.display = 'none';
+      this.showStep(5);
+
+    } catch (error) {
+      console.error('Auth code exchange failed:', error);
+      errorEl.textContent = `Failed to exchange code: ${error.message}`;
+      errorEl.style.display = 'block';
+      progressEl.style.display = 'none';
+    }
   }
 
   /**
@@ -476,6 +552,21 @@ export class OnboardingUI {
       .privacy-notice li {
         margin: 8px 0;
         color: #333;
+      }
+
+      .disclaimer-notice {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 20px 0;
+        text-align: center;
+      }
+
+      .disclaimer-notice p {
+        margin: 0;
+        color: #856404;
+        line-height: 1.4;
       }
 
       .instructions {
