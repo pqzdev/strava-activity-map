@@ -381,49 +381,6 @@ function populateColorSchemes() {
 
     container.appendChild(row);
   });
-
-  // Add default color picker
-  const defaultRow = document.createElement('div');
-  defaultRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin: 10px 0; padding: 8px; background: #f0f0f0; border-radius: 4px;';
-
-  const defaultLabel = document.createElement('span');
-  defaultLabel.textContent = 'Other';
-  defaultLabel.style.cssText = 'font-weight: 500; min-width: 80px; font-style: italic;';
-
-  const defaultSelect = document.createElement('select');
-  defaultSelect.style.cssText = 'flex: 1; margin: 0 10px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;';
-
-  COLOR_PALETTE.forEach(color => {
-    const option = document.createElement('option');
-    option.value = color.value;
-    option.textContent = color.name;
-    option.style.cssText = `background: ${color.value}; color: white;`;
-    if ((customActivityColors.default || DEFAULT_ACTIVITY_COLORS.default) === color.value) {
-      option.selected = true;
-    }
-    defaultSelect.appendChild(option);
-  });
-
-  const defaultPreview = document.createElement('div');
-  defaultPreview.style.cssText = `width: 30px; height: 30px; background: ${customActivityColors.default || DEFAULT_ACTIVITY_COLORS.default}; border-radius: 4px; border: 2px solid #ddd;`;
-
-  defaultSelect.addEventListener('change', () => {
-    const newColor = defaultSelect.value;
-    customActivityColors.default = newColor;
-    defaultPreview.style.background = newColor;
-
-    if (animationController) {
-      initializeAnimation();
-    } else {
-      renderActivities();
-    }
-  });
-
-  defaultRow.appendChild(defaultLabel);
-  defaultRow.appendChild(defaultSelect);
-  defaultRow.appendChild(defaultPreview);
-
-  container.appendChild(defaultRow);
 }
 
 // Get selected activity types
