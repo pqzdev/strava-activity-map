@@ -148,8 +148,9 @@ async function init() {
   // Check if user is authenticated
   const status = auth.getStatus();
 
-  if (status.isAuthenticated && api.hasCachedActivities()) {
-    // User has auth and cached data - load directly
+  // Prioritize cached activities - load them regardless of auth status
+  // User can refresh later if they want new data
+  if (api.hasCachedActivities()) {
     loadCachedActivities();
   } else if (status.isAuthenticated) {
     // User has auth but no cached data - show onboarding to fetch
