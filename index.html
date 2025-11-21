@@ -157,15 +157,25 @@
     }
 
     .activity-pill.all-pill {
-      background: #0066cc;
+      background: #999999;
       color: white;
+      border-color: #999999;
+      font-weight: 700;
+    }
+
+    .activity-pill.all-pill.selected {
+      background: #0066cc;
       border-color: #0066cc;
-      font-weight: 600;
     }
 
     .activity-pill.all-pill:hover {
+      opacity: 0.85;
+    }
+
+    .activity-pill.all-pill.selected:hover {
       background: #0052a3;
       border-color: #0052a3;
+      opacity: 1;
     }
 
     .activity-pill input[type="checkbox"] {
@@ -302,7 +312,7 @@
 
     #capture-overlay.active {
       display: block;
-      box-shadow: 0 0 0 9999px rgba(252, 76, 2, 0.3);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
     }
 
     /* Capture area box */
@@ -310,13 +320,18 @@
       position: absolute;
       border: 3px dashed #fc4c02;
       background: transparent;
-      pointer-events: none;
+      pointer-events: auto;
+      cursor: move;
       z-index: 999;
       display: none;
     }
 
     #capture-box.active {
       display: block;
+    }
+
+    .capture-box-label {
+      pointer-events: none;
     }
 
     .capture-box-handle {
@@ -455,12 +470,12 @@
         <li>Adjust the <strong>speed</strong> to control how fast activities appear</li>
       </ul>
 
-      <h3><i class="fas fa-camera"></i> Export GIF</h3>
+      <h3><i class="fas fa-camera"></i> Produce GIF</h3>
       <ul>
         <li>Choose a <strong>capture area</strong> (Max, Square, Vertical/Horizontal phone, or Free)</li>
         <li>Select your <strong>date range</strong> to export a specific period</li>
         <li>Customize <strong>dimensions and FPS</strong> for the perfect GIF</li>
-        <li>Click <strong>Export GIF</strong> to create your animation</li>
+        <li>Click <strong>Produce GIF</strong> to create your animation, then <strong>Save GIF</strong> to download</li>
       </ul>
 
       <h3><i class="fas fa-filter"></i> Activity Filters</h3>
@@ -618,7 +633,10 @@
         </div>
       </div>
 
-      <button id="export-btn">Export GIF</button>
+      <button id="export-btn">Produce GIF</button>
+      <button id="save-gif-btn" style="display: none; background: #fc4c02; margin-left: 10px;">
+        <i class="fas fa-save"></i> Save GIF
+      </button>
     </details>
 
     <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 10px; text-align: center; color: #999;">

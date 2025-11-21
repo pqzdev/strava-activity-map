@@ -29,7 +29,8 @@ export class GifExporter {
       width = 1200,
       height = 800,
       fps = 15,
-      quality = 10 // 1-30, lower is better quality but slower
+      quality = 10, // 1-30, lower is better quality but slower
+      captureBox = null // { left, top, width, height } in pixels
     } = options;
 
     console.log('Starting export with options:', { startDate, endDate, duration, width, height, fps, quality });
@@ -64,13 +65,21 @@ export class GifExporter {
       // Calculate frame times based on activity dates (skip empty periods)
       const frameTimes = this._calculateFrameTimes(startDate, endDate, frameCount, activityDates);
 
+      // Calculate the actual lat/lng bounds for the capture box area
+      // If no capture box specified, use full map bounds
+      let exportBounds;
+      if (captureBox) {
+        exportBounds = this._getCaptureBoxBounds(captureBox);
+        console.log('Using capture box bounds:', exportBounds);
+      } else {
+        exportBounds = this.map.getBounds();
+        console.log('Using full map bounds:', exportBounds);
+      }
+
       // Capture base map tiles once (reused for all frames)
-      // Also save the map bounds/zoom for coordinate conversion
       this._updateProgress(5, 'Capturing base map...');
-      const mapBounds = this.map.getBounds();
-      const mapZoom = this.map.getZoom();
-      const baseMapCanvas = await this._captureBasemap(width, height);
-      console.log('Base map captured', { bounds: mapBounds, zoom: mapZoom });
+      const baseMapCanvas = await this._captureBasemap(width, height, captureBox);
+      console.log('Base map captured');
 
       // Capture frames using calculated times (skips empty periods)
       for (let i = 0; i < frameTimes.length; i++) {
@@ -83,7 +92,7 @@ export class GifExporter {
         await this._waitForMapRender();
 
         // Capture frame (polylines only, then composite with base map)
-        const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, mapBounds, mapZoom, false);
+        const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, exportBounds, false);
         frames.push(canvas);
 
         // Update progress (5-50% for frame capture)
@@ -94,7 +103,7 @@ export class GifExporter {
       // Capture final "heatmap" frame showing all routes with equal opacity
       // This highlights the most common paths through overlapping
       // We draw ALL activities directly, bypassing the maxVisibleActivities limit
-      const finalCanvas = await this._captureHeatmapFrame(width, height, baseMapCanvas, mapBounds);
+      const finalCanvas = await this._captureHeatmapFrame(width, height, baseMapCanvas, exportBounds);
       frames.push(finalCanvas);
       this._updateProgress(50, `Captured final heatmap frame`);
 
@@ -125,31 +134,67 @@ export class GifExporter {
   }
 
   /**
-   * Capture base map tiles (called once per export)
+   * Convert capture box pixel coordinates to lat/lng bounds
    */
-  async _captureBasemap(width, height) {
+  _getCaptureBoxBounds(captureBox) {
+    const mapContainer = this.map.getContainer();
+    const mapWidth = mapContainer.clientWidth;
+    const mapHeight = mapContainer.clientHeight;
+
+    // Convert pixel positions to lat/lng using Leaflet's containerPointToLatLng
+    const topLeft = this.map.containerPointToLatLng([captureBox.left, captureBox.top]);
+    const bottomRight = this.map.containerPointToLatLng([
+      captureBox.left + captureBox.width,
+      captureBox.top + captureBox.height
+    ]);
+
+    return L.latLngBounds(topLeft, bottomRight);
+  }
+
+  /**
+   * Capture base map tiles (called once per export)
+   * If captureBox is provided, only capture that area
+   */
+  async _captureBasemap(width, height, captureBox = null) {
     const mapContainer = this.map.getContainer();
 
-    // Use html2canvas to capture the map tiles at their current size
-    const canvas = await html2canvas(mapContainer, {
+    // Use html2canvas to capture the map tiles
+    const fullCanvas = await html2canvas(mapContainer, {
       scale: 1,
       useCORS: true,
       logging: false,
       backgroundColor: '#f5f5f5'
     });
 
-    return canvas;
+    // If capture box specified, crop to that area
+    if (captureBox) {
+      const croppedCanvas = document.createElement('canvas');
+      croppedCanvas.width = width;
+      croppedCanvas.height = height;
+      const ctx = croppedCanvas.getContext('2d');
+
+      // Draw the cropped portion of the map, scaled to export dimensions
+      ctx.drawImage(
+        fullCanvas,
+        captureBox.left, captureBox.top, captureBox.width, captureBox.height, // Source rectangle
+        0, 0, width, height // Destination rectangle
+      );
+
+      return croppedCanvas;
+    }
+
+    return fullCanvas;
   }
 
   /**
    * Capture map as canvas - composite base map with polylines
    * @param {boolean} isLastFrame - If true, render all routes with equal opacity to highlight overlaps
    */
-  async _captureMapCanvas(width, height, baseMapCanvas, mapBounds, mapZoom, isLastFrame = false) {
+  async _captureMapCanvas(width, height, baseMapCanvas, bounds, isLastFrame = false) {
     console.log(`Capturing frame: ${this.animationController.activePolylines.size} active polylines${isLastFrame ? ' (final heatmap frame)' : ''}`);
     console.log(`Export dimensions: ${width}x${height}`);
     console.log(`Base map canvas: ${baseMapCanvas.width}x${baseMapCanvas.height}`);
-    console.log(`Map bounds:`, mapBounds.toBBoxString());
+    console.log(`Bounds:`, bounds.toBBoxString());
 
     // Create an offscreen canvas
     const canvas = document.createElement('canvas');
@@ -173,9 +218,9 @@ export class GifExporter {
       const coords = data.coords;
       if (coords.length < 2) return;
 
-      // Convert lat/lng to pixel coordinates using the saved map bounds
+      // Convert lat/lng to pixel coordinates using the export bounds
       const points = coords.map(([lat, lng]) => {
-        const pixel = this._latLngToPixel(lat, lng, mapBounds, width, height);
+        const pixel = this._latLngToPixel(lat, lng, bounds, width, height);
         return pixel;
       });
 
@@ -272,7 +317,7 @@ export class GifExporter {
    * Capture heatmap frame showing ALL activities with equal opacity
    * Bypasses the maxVisibleActivities limit to show complete route coverage
    */
-  async _captureHeatmapFrame(width, height, baseMapCanvas, mapBounds) {
+  async _captureHeatmapFrame(width, height, baseMapCanvas, bounds) {
     const activities = this.animationController.activities;
     console.log(`Capturing heatmap frame with ALL ${activities.length} activities`);
 
@@ -302,7 +347,7 @@ export class GifExporter {
 
       // Convert lat/lng to pixel coordinates
       const points = coords.map(([lat, lng]) => {
-        const pixel = this._latLngToPixel(lat, lng, mapBounds, width, height);
+        const pixel = this._latLngToPixel(lat, lng, bounds, width, height);
         return pixel;
       });
 

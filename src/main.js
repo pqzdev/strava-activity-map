@@ -91,6 +91,7 @@ const timeDisplay = document.getElementById('time-display');
 // Export controls
 const exportControlsEl = document.getElementById('export-controls');
 const exportBtn = document.getElementById('export-btn');
+const saveGifBtn = document.getElementById('save-gif-btn');
 const exportStartDate = document.getElementById('export-start-date');
 const exportEndDate = document.getElementById('export-end-date');
 const exportDuration = document.getElementById('export-duration');
@@ -102,6 +103,9 @@ const progressFill = document.getElementById('progress-fill');
 const exportStatus = document.getElementById('export-status');
 const exportComplete = document.getElementById('export-complete');
 const downloadLink = document.getElementById('download-link');
+
+// Store the last exported GIF blob
+let lastExportedGif = null;
 
 // Main initialization
 async function init() {
@@ -277,8 +281,18 @@ function populateColorSchemes() {
   const container = document.getElementById('color-schemes-list');
   container.innerHTML = '';
 
-  // Get unique activity types from loaded activities
-  const activityTypes = [...new Set(activities.map(a => a.type))].sort();
+  // Get selected activity types
+  const selectedTypes = getSelectedActivityTypes();
+
+  // Get activity types to show in color picker
+  let activityTypes;
+  if (selectedTypes === 'all') {
+    // Show all activity types
+    activityTypes = [...new Set(activities.map(a => a.type))].sort();
+  } else {
+    // Show only selected activity types
+    activityTypes = selectedTypes.sort();
+  }
 
   // Initialize custom colors with defaults
   activityTypes.forEach(type => {
@@ -420,6 +434,9 @@ function handleActivityTypeChange() {
       pill.classList.remove('selected');
     });
   }
+
+  // Update color schemes to show only selected types
+  populateColorSchemes();
 
   // Re-render activities with new filter
   if (animationController) {
@@ -581,16 +598,18 @@ function initializeCaptureBox() {
   setupCaptureBoxResize();
 }
 
-// Setup capture box resize functionality
+// Setup capture box resize and drag functionality
 function setupCaptureBoxResize() {
   const captureBoxEl = document.getElementById('capture-box');
   const handles = captureBoxEl.querySelectorAll('.capture-box-handle');
   const mapContainer = map.getContainer();
 
   let isResizing = false;
+  let isDragging = false;
   let currentHandle = null;
   let startX, startY, startWidth, startHeight, startLeft, startTop;
 
+  // Handle resize from corner handles
   handles.forEach(handle => {
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -614,8 +633,36 @@ function setupCaptureBoxResize() {
     });
   });
 
+  // Handle drag from box body
+  captureBoxEl.addEventListener('mousedown', (e) => {
+    // Don't start dragging if clicking on a handle
+    if (e.target.classList.contains('capture-box-handle')) return;
+    // Don't start dragging if clicking on the label
+    if (e.target.id === 'capture-box-label' || e.target.closest('#capture-box-label')) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startLeft = captureBoxEl.offsetLeft;
+    startTop = captureBoxEl.offsetTop;
+    startWidth = captureBoxEl.offsetWidth;
+    startHeight = captureBoxEl.offsetHeight;
+
+    // Disable map dragging
+    map.dragging.disable();
+
+    // Change cursor to move
+    captureBoxEl.style.cursor = 'move';
+
+    // Set to free mode when manually dragging
+    captureBox.ratio = 'free';
+  });
+
   document.addEventListener('mousemove', (e) => {
-    if (!isResizing) return;
+    if (!isResizing && !isDragging) return;
 
     e.preventDefault();
 
@@ -627,38 +674,53 @@ function setupCaptureBoxResize() {
     let newLeft = startLeft;
     let newTop = startTop;
 
-    // Calculate new dimensions based on which handle is being dragged
-    switch (currentHandle) {
-      case 'se': // Bottom-right
-        newWidth = startWidth + dx;
-        newHeight = startHeight + dy;
-        break;
-      case 'sw': // Bottom-left
-        newWidth = startWidth - dx;
-        newHeight = startHeight + dy;
-        newLeft = startLeft + dx;
-        break;
-      case 'ne': // Top-right
-        newWidth = startWidth + dx;
-        newHeight = startHeight - dy;
-        newTop = startTop + dy;
-        break;
-      case 'nw': // Top-left
-        newWidth = startWidth - dx;
-        newHeight = startHeight - dy;
-        newLeft = startLeft + dx;
-        newTop = startTop + dy;
-        break;
+    if (isDragging) {
+      // Dragging the box
+      newLeft = startLeft + dx;
+      newTop = startTop + dy;
+
+      // Constrain to map bounds
+      const mapWidth = mapContainer.clientWidth;
+      const mapHeight = mapContainer.clientHeight;
+
+      newLeft = Math.max(0, Math.min(newLeft, mapWidth - startWidth));
+      newTop = Math.max(0, Math.min(newTop, mapHeight - startHeight));
+
+    } else if (isResizing) {
+      // Resizing with handles
+      // Calculate new dimensions based on which handle is being dragged
+      switch (currentHandle) {
+        case 'se': // Bottom-right
+          newWidth = startWidth + dx;
+          newHeight = startHeight + dy;
+          break;
+        case 'sw': // Bottom-left
+          newWidth = startWidth - dx;
+          newHeight = startHeight + dy;
+          newLeft = startLeft + dx;
+          break;
+        case 'ne': // Top-right
+          newWidth = startWidth + dx;
+          newHeight = startHeight - dy;
+          newTop = startTop + dy;
+          break;
+        case 'nw': // Top-left
+          newWidth = startWidth - dx;
+          newHeight = startHeight - dy;
+          newLeft = startLeft + dx;
+          newTop = startTop + dy;
+          break;
+      }
+
+      // Constrain to map bounds
+      const mapWidth = mapContainer.clientWidth;
+      const mapHeight = mapContainer.clientHeight;
+
+      newWidth = Math.max(100, Math.min(newWidth, mapWidth - newLeft));
+      newHeight = Math.max(100, Math.min(newHeight, mapHeight - newTop));
+      newLeft = Math.max(0, Math.min(newLeft, mapWidth - 100));
+      newTop = Math.max(0, Math.min(newTop, mapHeight - 100));
     }
-
-    // Constrain to map bounds
-    const mapWidth = mapContainer.clientWidth;
-    const mapHeight = mapContainer.clientHeight;
-
-    newWidth = Math.max(100, Math.min(newWidth, mapWidth - newLeft));
-    newHeight = Math.max(100, Math.min(newHeight, mapHeight - newTop));
-    newLeft = Math.max(0, Math.min(newLeft, mapWidth - 100));
-    newTop = Math.max(0, Math.min(newTop, mapHeight - 100));
 
     // Apply new dimensions
     captureBoxEl.style.width = `${newWidth}px`;
@@ -692,9 +754,13 @@ function setupCaptureBoxResize() {
   });
 
   document.addEventListener('mouseup', () => {
-    if (isResizing) {
+    if (isResizing || isDragging) {
       isResizing = false;
+      isDragging = false;
       currentHandle = null;
+
+      // Reset cursor
+      captureBoxEl.style.cursor = '';
 
       // Re-enable map dragging
       map.dragging.enable();
@@ -830,6 +896,9 @@ activityTypeAll.parentElement.addEventListener('click', (e) => {
     });
   }
 
+  // Update color schemes to show selected types
+  populateColorSchemes();
+
   // Re-render
   if (animationController) {
     initializeAnimation();
@@ -938,7 +1007,7 @@ exportBtn.addEventListener('click', async () => {
     // Show progress
     exportProgress.style.display = 'block';
     exportBtn.disabled = true;
-    exportBtn.textContent = 'Exporting...';
+    exportBtn.textContent = 'Producing...';
 
     // Set up progress callback
     gifExporter.onProgress = (percent, message) => {
@@ -947,7 +1016,7 @@ exportBtn.addEventListener('click', async () => {
       exportStatus.textContent = message;
     };
 
-    // Export GIF
+    // Export GIF with capture box bounds
     const blob = await gifExporter.export({
       startDate,
       endDate,
@@ -955,20 +1024,27 @@ exportBtn.addEventListener('click', async () => {
       width,
       height,
       fps,
-      quality: 10
+      quality: 10,
+      captureBox: captureBox.bounds // Pass the capture box bounds
     });
 
-    // Create download link
-    const filename = `strava-activities-${formatDateForInput(startDate)}-to-${formatDateForInput(endDate)}.gif`;
-    const url = URL.createObjectURL(blob);
-    downloadLink.href = url;
-    downloadLink.download = filename;
+    // Store the blob and filename
+    lastExportedGif = {
+      blob,
+      filename: `strava-activities-${formatDateForInput(startDate)}-to-${formatDateForInput(endDate)}.gif`
+    };
 
-    // Show download link
+    // Hide progress, show Save button
     exportProgress.style.display = 'none';
-    exportComplete.style.display = 'block';
+    exportComplete.style.display = 'none'; // Hide old download link
+
+    // Make produce button grey but keep it active
     exportBtn.disabled = false;
-    exportBtn.textContent = 'Export GIF';
+    exportBtn.textContent = 'Produce GIF';
+    exportBtn.style.background = '#999999';
+
+    // Show Save GIF button
+    saveGifBtn.style.display = 'inline-block';
 
     console.log(`GIF ready! Size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
 
@@ -977,8 +1053,26 @@ exportBtn.addEventListener('click', async () => {
     alert(`Export failed: ${error.message}`);
     exportProgress.style.display = 'none';
     exportBtn.disabled = false;
-    exportBtn.textContent = 'Export GIF';
+    exportBtn.textContent = 'Produce GIF';
+    exportBtn.style.background = ''; // Reset background
   }
+});
+
+// Save GIF button click handler
+saveGifBtn.addEventListener('click', () => {
+  if (!lastExportedGif) return;
+
+  // Create download link and trigger download
+  const url = URL.createObjectURL(lastExportedGif.blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = lastExportedGif.filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  console.log(`Downloaded: ${lastExportedGif.filename}`);
 });
 
 // Start the app
