@@ -24,6 +24,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 map.on('moveend', () => {
   if (activities.length > 0) {
     updateStats();
+    scheduleURLUpdate(); // Update URL with new map position
   }
 });
 
@@ -228,6 +229,73 @@ function handleActivitiesLoaded(loadedActivities) {
   // Initialize capture box
   initializeCaptureBox();
 
+  // Restore state from URL (after everything is initialized)
+  restoreStateFromURL();
+
+  // Apply pending activity type filters (if restored from URL)
+  if (window.pendingActivityTypesRestore) {
+    const types = window.pendingActivityTypesRestore;
+    const allPill = activityTypeAll.parentElement;
+
+    // Uncheck "All"
+    activityTypeAll.checked = false;
+    allPill.classList.remove('selected');
+
+    // Check the specified types
+    document.querySelectorAll('.activity-type-checkbox').forEach(checkbox => {
+      const isSelected = types.includes(checkbox.value);
+      checkbox.checked = isSelected;
+      checkbox.parentElement.classList.toggle('selected', isSelected);
+    });
+
+    // Update UI
+    populateColorSchemes();
+    if (animationController) {
+      initializeAnimation();
+    } else {
+      renderActivities();
+    }
+
+    delete window.pendingActivityTypesRestore;
+  }
+
+  // Apply pending capture box position (if restored from URL)
+  if (window.pendingCaptureBoxRestore) {
+    const { left, top, width, height } = window.pendingCaptureBoxRestore;
+    const captureBoxEl = document.getElementById('capture-box');
+    const captureOverlay = document.getElementById('capture-overlay');
+
+    captureBoxEl.style.left = `${left}px`;
+    captureBoxEl.style.top = `${top}px`;
+    captureBoxEl.style.width = `${width}px`;
+    captureBoxEl.style.height = `${height}px`;
+
+    captureOverlay.style.left = `${left}px`;
+    captureOverlay.style.top = `${top}px`;
+    captureOverlay.style.width = `${width}px`;
+    captureOverlay.style.height = `${height}px`;
+
+    const labelEl = document.getElementById('capture-box-label');
+    const aspectRatio = (width / height).toFixed(2);
+    labelEl.textContent = `${Math.round(width)}×${Math.round(height)} (${aspectRatio}:1)`;
+
+    captureBox.bounds = { left, top, width, height };
+
+    delete window.pendingCaptureBoxRestore;
+  }
+
+  // Apply pending animation time (if restored from URL)
+  if (window.pendingAnimationTimeRestore && animationController) {
+    const targetDate = new Date(window.pendingAnimationTimeRestore);
+    if (!isNaN(targetDate.getTime())) {
+      animationController.seek(targetDate);
+    }
+    delete window.pendingAnimationTimeRestore;
+  }
+
+  // Update GIF size estimate after restoring dimensions
+  updateGifSizeEstimate();
+
   // Hide loading
   loadingEl.classList.add('hidden');
 
@@ -236,8 +304,13 @@ function handleActivitiesLoaded(loadedActivities) {
   logoutBtn.style.display = 'inline-block';
   loadBtn.style.display = 'none';
 
-  // Show instructions popup
-  document.getElementById('instructions-popup').classList.add('active');
+  // Show instructions popup (only if no URL state was restored)
+  if (!window.location.hash) {
+    document.getElementById('instructions-popup').classList.add('active');
+  }
+
+  // Encode initial state to URL
+  scheduleURLUpdate();
 
   console.log(`Loaded ${activities.length} activities`);
 }
@@ -447,6 +520,9 @@ function handleActivityTypeChange() {
   } else {
     renderActivities();
   }
+
+  // Update URL with new activity type selection
+  scheduleURLUpdate();
 }
 
 function renderActivities() {
@@ -929,6 +1005,9 @@ function setupCaptureBoxResize() {
 
       // Re-enable map dragging
       map.dragging.enable();
+
+      // Update URL after capture box move/resize
+      scheduleURLUpdate();
     }
   });
 }
@@ -1024,6 +1103,9 @@ function updateCaptureBox(ratio) {
 
   // Update size estimate
   updateGifSizeEstimate();
+
+  // Update URL with new capture box state
+  scheduleURLUpdate();
 }
 
 // Event listeners
@@ -1094,6 +1176,9 @@ activityTypeAll.parentElement.addEventListener('click', (e) => {
   } else {
     renderActivities();
   }
+
+  // Update URL with new selection
+  scheduleURLUpdate();
 });
 
 // Animation controls
@@ -1124,6 +1209,7 @@ timelineSlider.addEventListener('input', (e) => {
   const totalTime = animationController.endTime - animationController.startTime;
   const newTime = new Date(animationController.startTime.getTime() + (totalTime * progress));
   animationController.seek(newTime);
+  scheduleURLUpdate(); // Update URL with new time position
 });
 
 speedSlider.addEventListener('input', (e) => {
@@ -1160,6 +1246,7 @@ exportWidth.addEventListener('input', () => {
   exportHeight.value = Math.round(newWidth / aspectRatio);
 
   updateGifSizeEstimate();
+  scheduleURLUpdate();
 });
 
 exportHeight.addEventListener('input', () => {
@@ -1172,6 +1259,7 @@ exportHeight.addEventListener('input', () => {
   exportWidth.value = Math.round(newHeight * aspectRatio);
 
   updateGifSizeEstimate();
+  scheduleURLUpdate();
 });
 
 // Estimate GIF file size based on settings
@@ -1221,8 +1309,16 @@ function updateGifSizeEstimate() {
 }
 
 // Update estimate when export settings change (width/height handled above with aspect ratio)
-exportDuration.addEventListener('input', updateGifSizeEstimate);
-exportFps.addEventListener('change', updateGifSizeEstimate);
+exportDuration.addEventListener('input', () => {
+  updateGifSizeEstimate();
+  scheduleURLUpdate();
+});
+exportFps.addEventListener('change', () => {
+  updateGifSizeEstimate();
+  scheduleURLUpdate();
+});
+exportStartDate.addEventListener('change', scheduleURLUpdate);
+exportEndDate.addEventListener('change', scheduleURLUpdate);
 
 // Initialize the estimate on load
 updateGifSizeEstimate();
@@ -1326,6 +1422,169 @@ saveGifBtn.addEventListener('click', () => {
 
   console.log(`Downloaded: ${lastExportedGif.filename}`);
 });
+
+// ============================================================================
+// URL State Management
+// ============================================================================
+
+/**
+ * Encode current application state to URL hash
+ */
+function encodeStateToURL() {
+  if (!map || !activities.length) return; // Don't encode if not fully initialized
+
+  const params = new URLSearchParams();
+
+  // Map state
+  const center = map.getCenter();
+  params.set('lat', center.lat.toFixed(6));
+  params.set('lng', center.lng.toFixed(6));
+  params.set('zoom', map.getZoom());
+
+  // Capture box state
+  params.set('ratio', captureBox.ratio);
+  if (captureBox.bounds) {
+    params.set('boxLeft', Math.round(captureBox.bounds.left));
+    params.set('boxTop', Math.round(captureBox.bounds.top));
+    params.set('boxWidth', Math.round(captureBox.bounds.width));
+    params.set('boxHeight', Math.round(captureBox.bounds.height));
+  }
+
+  // Activity type filters
+  const selectedTypes = getSelectedActivityTypes();
+  if (selectedTypes !== 'all') {
+    params.set('types', selectedTypes.join(','));
+  }
+
+  // GIF export settings
+  params.set('gifWidth', exportWidth.value);
+  params.set('gifHeight', exportHeight.value);
+  params.set('gifDuration', exportDuration.value);
+  params.set('gifFps', exportFps.value);
+  if (exportStartDate.value) {
+    params.set('gifStart', exportStartDate.value);
+  }
+  if (exportEndDate.value) {
+    params.set('gifEnd', exportEndDate.value);
+  }
+
+  // Animation current time
+  if (animationController && animationController.currentTime) {
+    params.set('time', animationController.currentTime.toISOString().split('T')[0]);
+  }
+
+  // Update URL without triggering page reload
+  window.history.replaceState({}, '', `#${params.toString()}`);
+}
+
+/**
+ * Restore application state from URL hash
+ */
+function restoreStateFromURL() {
+  const hash = window.location.hash.slice(1); // Remove '#'
+  if (!hash) return false;
+
+  const params = new URLSearchParams(hash);
+  let stateRestored = false;
+
+  // Map state
+  if (params.has('lat') && params.has('lng') && params.has('zoom')) {
+    const lat = parseFloat(params.get('lat'));
+    const lng = parseFloat(params.get('lng'));
+    const zoom = parseInt(params.get('zoom'));
+    if (!isNaN(lat) && !isNaN(lng) && !isNaN(zoom)) {
+      map.setView([lat, lng], zoom);
+      stateRestored = true;
+    }
+  }
+
+  // Capture box ratio
+  if (params.has('ratio')) {
+    const ratio = params.get('ratio');
+    if (['max', 'square', 'vertical', 'horizontal', 'free'].includes(ratio)) {
+      captureBox.ratio = ratio;
+      // Update the UI to reflect the ratio
+      document.querySelectorAll('.aspect-ratio-pill').forEach(pill => {
+        const pillRatio = pill.querySelector('input').value;
+        if (pillRatio === ratio) {
+          pill.querySelector('input').checked = true;
+          pill.classList.add('selected');
+        } else {
+          pill.querySelector('input').checked = false;
+          pill.classList.remove('selected');
+        }
+      });
+    }
+  }
+
+  // Capture box position (for custom positions)
+  if (params.has('boxLeft') && params.has('boxTop') && params.has('boxWidth') && params.has('boxHeight')) {
+    const left = parseInt(params.get('boxLeft'));
+    const top = parseInt(params.get('boxTop'));
+    const width = parseInt(params.get('boxWidth'));
+    const height = parseInt(params.get('boxHeight'));
+
+    if (!isNaN(left) && !isNaN(top) && !isNaN(width) && !isNaN(height)) {
+      // Store for later application (after capture box is initialized)
+      window.pendingCaptureBoxRestore = { left, top, width, height };
+      stateRestored = true;
+    }
+  }
+
+  // Activity type filters
+  if (params.has('types')) {
+    const types = params.get('types').split(',').filter(t => t.trim());
+    if (types.length > 0) {
+      // Store for later application (after activity types are populated)
+      window.pendingActivityTypesRestore = types;
+      stateRestored = true;
+    }
+  }
+
+  // GIF export settings
+  if (params.has('gifWidth')) {
+    const width = parseInt(params.get('gifWidth'));
+    if (!isNaN(width)) exportWidth.value = width;
+  }
+  if (params.has('gifHeight')) {
+    const height = parseInt(params.get('gifHeight'));
+    if (!isNaN(height)) exportHeight.value = height;
+  }
+  if (params.has('gifDuration')) {
+    const duration = parseInt(params.get('gifDuration'));
+    if (!isNaN(duration)) exportDuration.value = duration;
+  }
+  if (params.has('gifFps')) {
+    const fps = parseInt(params.get('gifFps'));
+    if (!isNaN(fps)) exportFps.value = fps;
+  }
+  if (params.has('gifStart')) {
+    exportStartDate.value = params.get('gifStart');
+  }
+  if (params.has('gifEnd')) {
+    exportEndDate.value = params.get('gifEnd');
+  }
+
+  // Animation time
+  if (params.has('time')) {
+    // Store for later application (after animation is initialized)
+    window.pendingAnimationTimeRestore = params.get('time');
+    stateRestored = true;
+  }
+
+  return stateRestored;
+}
+
+/**
+ * Debounced URL update to avoid updating too frequently
+ */
+let urlUpdateTimeout;
+function scheduleURLUpdate() {
+  clearTimeout(urlUpdateTimeout);
+  urlUpdateTimeout = setTimeout(() => {
+    encodeStateToURL();
+  }, 500); // Update URL 500ms after last state change
+}
 
 // Start the app
 init();
