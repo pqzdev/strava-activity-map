@@ -73,7 +73,7 @@ export class StravaAPI {
   }
 
   /**
-   * Cache activities in sessionStorage
+   * Cache activities in localStorage
    */
   cacheActivities(activities) {
     try {
@@ -82,15 +82,9 @@ export class StravaAPI {
         cachedAt: Date.now(),
         count: activities.length
       };
-      sessionStorage.setItem(this.storageKey, JSON.stringify(data));
+      localStorage.setItem(this.storageKey, JSON.stringify(data));
     } catch (e) {
-      // sessionStorage might be full - try localStorage
-      try {
-        localStorage.setItem(this.storageKey, JSON.stringify(data));
-        console.warn('sessionStorage full, using localStorage instead');
-      } catch (e2) {
-        console.error('Failed to cache activities:', e2);
-      }
+      console.error('Failed to cache activities:', e);
     }
   }
 
@@ -99,7 +93,7 @@ export class StravaAPI {
    */
   getCachedActivities() {
     try {
-      const data = sessionStorage.getItem(this.storageKey) || localStorage.getItem(this.storageKey);
+      const data = localStorage.getItem(this.storageKey);
       if (!data) return null;
 
       const parsed = JSON.parse(data);
@@ -114,7 +108,7 @@ export class StravaAPI {
    * Check if cache exists and is recent
    */
   hasCachedActivities() {
-    const data = sessionStorage.getItem(this.storageKey) || localStorage.getItem(this.storageKey);
+    const data = localStorage.getItem(this.storageKey);
     return !!data;
   }
 
@@ -123,7 +117,7 @@ export class StravaAPI {
    */
   getCacheInfo() {
     try {
-      const data = sessionStorage.getItem(this.storageKey) || localStorage.getItem(this.storageKey);
+      const data = localStorage.getItem(this.storageKey);
       if (!data) return null;
 
       const parsed = JSON.parse(data);
@@ -141,7 +135,6 @@ export class StravaAPI {
    * Clear cached activities
    */
   clearCache() {
-    sessionStorage.removeItem(this.storageKey);
     localStorage.removeItem(this.storageKey);
   }
 
