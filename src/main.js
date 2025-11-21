@@ -778,7 +778,7 @@ function setupCaptureBoxResize() {
       let targetAspectRatio = null;
 
       if (lockAspectRatio) {
-        // Calculate target aspect ratio based on mode
+        // Calculate target aspect ratio (width/height)
         if (captureBox.ratio === 'square') {
           targetAspectRatio = 1; // 1:1
         } else if (captureBox.ratio === 'vertical') {
@@ -788,51 +788,108 @@ function setupCaptureBoxResize() {
         }
       }
 
-      // Calculate new dimensions based on which handle is being dragged
+      // For each corner, the opposite corner is the anchor point that stays locked
+      // Calculate dimensions based on handle and lock opposite corner in place
       if (lockAspectRatio && targetAspectRatio) {
-        // For locked aspect ratio, calculate based on the dominant dimension
-        const totalDelta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
-
+        // With locked aspect ratio, follow the cursor as closely as possible
+        // while maintaining the aspect ratio and keeping opposite corner fixed
         switch (currentHandle) {
-          case 'se': // Bottom-right
-            newWidth = startWidth + totalDelta;
-            newHeight = newWidth / targetAspectRatio;
+          case 'se': // Bottom-right (anchor: top-left)
+            // Opposite corner (top-left) stays at (startLeft, startTop)
+            // Calculate desired size to reach cursor from anchor
+            const desiredWidthSE = Math.abs(e.clientX - startLeft);
+            const desiredHeightSE = Math.abs(e.clientY - startTop);
+
+            // Use the dimension that gives us the larger box (closer to cursor)
+            if (desiredWidthSE / targetAspectRatio > desiredHeightSE) {
+              newHeight = desiredHeightSE;
+              newWidth = newHeight * targetAspectRatio;
+            } else {
+              newWidth = desiredWidthSE;
+              newHeight = newWidth / targetAspectRatio;
+            }
+            // Anchor stays at top-left
+            newLeft = startLeft;
+            newTop = startTop;
             break;
-          case 'sw': // Bottom-left
-            newWidth = startWidth - totalDelta;
-            newHeight = newWidth / targetAspectRatio;
-            newLeft = startLeft + totalDelta;
+
+          case 'sw': // Bottom-left (anchor: top-right)
+            // Opposite corner (top-right) stays at (startLeft + startWidth, startTop)
+            const anchorRightSW = startLeft + startWidth;
+            const desiredWidthSW = Math.abs(anchorRightSW - e.clientX);
+            const desiredHeightSW = Math.abs(e.clientY - startTop);
+
+            if (desiredWidthSW / targetAspectRatio > desiredHeightSW) {
+              newHeight = desiredHeightSW;
+              newWidth = newHeight * targetAspectRatio;
+            } else {
+              newWidth = desiredWidthSW;
+              newHeight = newWidth / targetAspectRatio;
+            }
+            // Anchor stays at top-right
+            newLeft = anchorRightSW - newWidth;
+            newTop = startTop;
             break;
-          case 'ne': // Top-right
-            newWidth = startWidth + totalDelta;
-            newHeight = newWidth / targetAspectRatio;
-            newTop = startTop - (newHeight - startHeight);
+
+          case 'ne': // Top-right (anchor: bottom-left)
+            // Opposite corner (bottom-left) stays at (startLeft, startTop + startHeight)
+            const anchorBottomNE = startTop + startHeight;
+            const desiredWidthNE = Math.abs(e.clientX - startLeft);
+            const desiredHeightNE = Math.abs(anchorBottomNE - e.clientY);
+
+            if (desiredWidthNE / targetAspectRatio > desiredHeightNE) {
+              newHeight = desiredHeightNE;
+              newWidth = newHeight * targetAspectRatio;
+            } else {
+              newWidth = desiredWidthNE;
+              newHeight = newWidth / targetAspectRatio;
+            }
+            // Anchor stays at bottom-left
+            newLeft = startLeft;
+            newTop = anchorBottomNE - newHeight;
             break;
-          case 'nw': // Top-left
-            newWidth = startWidth - totalDelta;
-            newHeight = newWidth / targetAspectRatio;
-            newLeft = startLeft + totalDelta;
-            newTop = startTop - (newHeight - startHeight);
+
+          case 'nw': // Top-left (anchor: bottom-right)
+            // Opposite corner (bottom-right) stays at (startLeft + startWidth, startTop + startHeight)
+            const anchorRightNW = startLeft + startWidth;
+            const anchorBottomNW = startTop + startHeight;
+            const desiredWidthNW = Math.abs(anchorRightNW - e.clientX);
+            const desiredHeightNW = Math.abs(anchorBottomNW - e.clientY);
+
+            if (desiredWidthNW / targetAspectRatio > desiredHeightNW) {
+              newHeight = desiredHeightNW;
+              newWidth = newHeight * targetAspectRatio;
+            } else {
+              newWidth = desiredWidthNW;
+              newHeight = newWidth / targetAspectRatio;
+            }
+            // Anchor stays at bottom-right
+            newLeft = anchorRightNW - newWidth;
+            newTop = anchorBottomNW - newHeight;
             break;
         }
       } else {
-        // Free resize (no aspect ratio lock)
+        // Free resize (no aspect ratio lock) - follow cursor exactly
         switch (currentHandle) {
-          case 'se': // Bottom-right
+          case 'se': // Bottom-right (anchor: top-left)
             newWidth = startWidth + dx;
             newHeight = startHeight + dy;
+            newLeft = startLeft;
+            newTop = startTop;
             break;
-          case 'sw': // Bottom-left
+          case 'sw': // Bottom-left (anchor: top-right)
             newWidth = startWidth - dx;
             newHeight = startHeight + dy;
             newLeft = startLeft + dx;
+            newTop = startTop;
             break;
-          case 'ne': // Top-right
+          case 'ne': // Top-right (anchor: bottom-left)
             newWidth = startWidth + dx;
             newHeight = startHeight - dy;
+            newLeft = startLeft;
             newTop = startTop + dy;
             break;
-          case 'nw': // Top-left
+          case 'nw': // Top-left (anchor: bottom-right)
             newWidth = startWidth - dx;
             newHeight = startHeight - dy;
             newLeft = startLeft + dx;
