@@ -1149,21 +1149,29 @@ document.querySelectorAll('.aspect-ratio-pill').forEach(pill => {
   });
 });
 
-// Export dimension controls - update capture box when dimensions change
+// Export dimension controls - maintain capture box aspect ratio
 exportWidth.addEventListener('input', () => {
-  if (captureBox.ratio !== 'free') return;
   const captureBoxEl = document.getElementById('capture-box');
+  const boxWidth = parseInt(captureBoxEl.style.width);
+  const boxHeight = parseInt(captureBoxEl.style.height);
+  const aspectRatio = boxWidth / boxHeight;
+
   const newWidth = parseInt(exportWidth.value);
-  const aspectRatio = parseInt(captureBoxEl.style.width) / parseInt(captureBoxEl.style.height);
   exportHeight.value = Math.round(newWidth / aspectRatio);
+
+  updateGifSizeEstimate();
 });
 
 exportHeight.addEventListener('input', () => {
-  if (captureBox.ratio !== 'free') return;
   const captureBoxEl = document.getElementById('capture-box');
+  const boxWidth = parseInt(captureBoxEl.style.width);
+  const boxHeight = parseInt(captureBoxEl.style.height);
+  const aspectRatio = boxWidth / boxHeight;
+
   const newHeight = parseInt(exportHeight.value);
-  const aspectRatio = parseInt(captureBoxEl.style.width) / parseInt(captureBoxEl.style.height);
   exportWidth.value = Math.round(newHeight * aspectRatio);
+
+  updateGifSizeEstimate();
 });
 
 // Estimate GIF file size based on settings
@@ -1212,9 +1220,7 @@ function updateGifSizeEstimate() {
   sizeEstimateValue.textContent = displayText;
 }
 
-// Update estimate when any export setting changes
-exportWidth.addEventListener('input', updateGifSizeEstimate);
-exportHeight.addEventListener('input', updateGifSizeEstimate);
+// Update estimate when export settings change (width/height handled above with aspect ratio)
 exportDuration.addEventListener('input', updateGifSizeEstimate);
 exportFps.addEventListener('change', updateGifSizeEstimate);
 
