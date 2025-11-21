@@ -30,7 +30,8 @@ export class GifExporter {
       height = 800,
       fps = 15,
       quality = 10, // 1-30, lower is better quality but slower
-      captureBox = null // { left, top, width, height } in pixels
+      captureBox = null, // { left, top, width, height } in pixels
+      dateOverlay = { enabled: false } // { enabled, corner, color }
     } = options;
 
     console.log('Starting export with options:', { startDate, endDate, duration, width, height, fps, quality });
@@ -92,7 +93,7 @@ export class GifExporter {
         await this._waitForMapRender();
 
         // Capture frame (polylines only, then composite with base map)
-        const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, exportBounds, false);
+        const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, exportBounds, false, currentTime, dateOverlay);
         frames.push(canvas);
 
         // Update progress (5-50% for frame capture)
@@ -103,7 +104,7 @@ export class GifExporter {
       // Capture final "heatmap" frame showing all routes with equal opacity
       // This highlights the most common paths through overlapping
       // We draw ALL activities directly, bypassing the maxVisibleActivities limit
-      const finalCanvas = await this._captureHeatmapFrame(width, height, baseMapCanvas, exportBounds);
+      const finalCanvas = await this._captureHeatmapFrame(width, height, baseMapCanvas, exportBounds, endDate, dateOverlay);
       frames.push(finalCanvas);
       this._updateProgress(50, `Captured final heatmap frame`);
 
@@ -202,8 +203,10 @@ export class GifExporter {
   /**
    * Capture map as canvas - composite base map with polylines
    * @param {boolean} isLastFrame - If true, render all routes with equal opacity to highlight overlaps
+   * @param {Date} currentTime - Current animation time for date overlay
+   * @param {Object} dateOverlay - Date overlay settings { enabled, corner, color }
    */
-  async _captureMapCanvas(width, height, baseMapCanvas, bounds, isLastFrame = false) {
+  async _captureMapCanvas(width, height, baseMapCanvas, bounds, isLastFrame = false, currentTime = null, dateOverlay = { enabled: false }) {
     console.log(`Capturing frame: ${this.animationController.activePolylines.size} active polylines${isLastFrame ? ' (final heatmap frame)' : ''}`);
     console.log(`Export dimensions: ${width}x${height}`);
     console.log(`Base map canvas: ${baseMapCanvas.width}x${baseMapCanvas.height}`);
@@ -277,6 +280,11 @@ export class GifExporter {
 
     console.log(`Drew ${drawnCount} polylines on canvas`);
 
+    // Render date overlay if enabled
+    if (dateOverlay.enabled && currentTime) {
+      this._renderDateOverlay(ctx, width, height, currentTime, dateOverlay.corner, dateOverlay.color);
+    }
+
     return canvas;
   }
 
@@ -329,8 +337,10 @@ export class GifExporter {
   /**
    * Capture heatmap frame showing ALL activities with equal opacity
    * Bypasses the maxVisibleActivities limit to show complete route coverage
+   * @param {Date} currentTime - Current animation time for date overlay
+   * @param {Object} dateOverlay - Date overlay settings { enabled, corner, color }
    */
-  async _captureHeatmapFrame(width, height, baseMapCanvas, bounds) {
+  async _captureHeatmapFrame(width, height, baseMapCanvas, bounds, currentTime = null, dateOverlay = { enabled: false }) {
     const activities = this.animationController.activities;
     console.log(`Capturing heatmap frame with ALL ${activities.length} activities`);
 
@@ -382,6 +392,11 @@ export class GifExporter {
 
     ctx.globalAlpha = 1;
     console.log(`Drew ${drawnCount} activities on heatmap frame`);
+
+    // Render date overlay if enabled
+    if (dateOverlay.enabled && currentTime) {
+      this._renderDateOverlay(ctx, width, height, currentTime, dateOverlay.corner, dateOverlay.color);
+    }
 
     return canvas;
   }
@@ -544,6 +559,76 @@ export class GifExporter {
     if (this.onProgress) {
       this.onProgress(percent, message);
     }
+  }
+
+  /**
+   * Format date as "27 May 1983"
+   */
+  _formatDate(date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  }
+
+  /**
+   * Render date overlay on canvas
+   */
+  _renderDateOverlay(ctx, width, height, date, corner, color) {
+    if (!date) return;
+
+    const dateText = this._formatDate(date);
+    const padding = Math.max(15, width * 0.015); // Responsive padding (min 15px)
+    const fontSize = Math.max(16, width * 0.02); // Responsive font size (min 16px)
+
+    ctx.save();
+    ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'top';
+
+    // Calculate text dimensions
+    const metrics = ctx.measureText(dateText);
+    const textWidth = metrics.width;
+    const textHeight = fontSize;
+
+    // Position based on corner
+    let x, y;
+    switch (corner) {
+      case 'top-left':
+        x = padding;
+        y = padding;
+        ctx.textAlign = 'left';
+        break;
+      case 'top-right':
+        x = width - padding;
+        y = padding;
+        ctx.textAlign = 'right';
+        break;
+      case 'bottom-left':
+        x = padding;
+        y = height - padding - textHeight;
+        ctx.textAlign = 'left';
+        break;
+      case 'bottom-right':
+        x = width - padding;
+        y = height - padding - textHeight;
+        ctx.textAlign = 'right';
+        break;
+      default:
+        x = padding;
+        y = padding;
+        ctx.textAlign = 'left';
+    }
+
+    // Add subtle shadow for better visibility
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+
+    ctx.fillText(dateText, x, y);
+    ctx.restore();
   }
 
   /**

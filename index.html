@@ -400,6 +400,81 @@
       border-color: #2196F3;
     }
 
+    /* Date overlay corner selector */
+    .corner-selector {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .corner-option {
+      aspect-ratio: 1;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      position: relative;
+      background: #f9f9f9;
+      transition: all 0.2s;
+    }
+
+    .corner-option:hover {
+      background: #e8e8e8;
+      border-color: #bbb;
+    }
+
+    .corner-option.selected {
+      background: #e3f2fd;
+      border-color: #2196F3;
+    }
+
+    .corner-option .corner-indicator {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #2196F3;
+      border-radius: 2px;
+    }
+
+    .corner-option[data-corner="top-left"] .corner-indicator {
+      top: 6px;
+      left: 6px;
+    }
+
+    .corner-option[data-corner="top-right"] .corner-indicator {
+      top: 6px;
+      right: 6px;
+    }
+
+    .corner-option[data-corner="bottom-left"] .corner-indicator {
+      bottom: 6px;
+      left: 6px;
+    }
+
+    .corner-option[data-corner="bottom-right"] .corner-indicator {
+      bottom: 6px;
+      right: 6px;
+    }
+
+    .date-overlay-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .date-overlay-checkbox input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .date-overlay-checkbox label {
+      margin: 0;
+      cursor: pointer;
+      user-select: none;
+    }
+
     /* Instructions popup */
     #instructions-popup,
     #logout-confirmation-popup {
@@ -646,6 +721,30 @@
           <option value="20">20 FPS (smoother)</option>
           <option value="30">30 FPS (smoothest, large file)</option>
         </select>
+      </div>
+
+      <div class="control-group">
+        <div class="date-overlay-checkbox">
+          <input type="checkbox" id="include-date-overlay">
+          <label for="include-date-overlay">Include date overlay</label>
+        </div>
+        <div id="date-corner-selector" style="display: none;">
+          <label style="font-size: 13px; color: #666; margin-top: 10px; display: block;">Corner Position</label>
+          <div class="corner-selector">
+            <div class="corner-option selected" data-corner="top-left" title="Top Left">
+              <div class="corner-indicator"></div>
+            </div>
+            <div class="corner-option" data-corner="top-right" title="Top Right">
+              <div class="corner-indicator"></div>
+            </div>
+            <div class="corner-option" data-corner="bottom-left" title="Bottom Left">
+              <div class="corner-indicator"></div>
+            </div>
+            <div class="corner-option" data-corner="bottom-right" title="Bottom Right">
+              <div class="corner-indicator"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="size-estimate" style="padding: 10px; background: #f0f9ff; border: 1px solid #0066cc; border-radius: 4px; margin-top: 15px; text-align: center;">

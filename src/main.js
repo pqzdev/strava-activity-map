@@ -76,6 +76,42 @@ function getActivityColors() {
   return customActivityColors;
 }
 
+// Get the dominant activity color (from the activity type with the most activities)
+function getDominantActivityColor() {
+  const filtered = getFilteredActivities();
+  if (filtered.length === 0) return '#2196F3'; // Default blue
+
+  // Count activities by type
+  const typeCounts = {};
+  filtered.forEach(activity => {
+    const type = activity.type;
+    typeCounts[type] = (typeCounts[type] || 0) + 1;
+  });
+
+  // Find the type with the most activities
+  let dominantType = null;
+  let maxCount = 0;
+  for (const [type, count] of Object.entries(typeCounts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      dominantType = type;
+    }
+  }
+
+  // Get the color for that type
+  if (dominantType && customActivityColors[dominantType]) {
+    return customActivityColors[dominantType];
+  }
+
+  return '#2196F3'; // Default blue
+}
+
+// Get selected corner for date overlay
+function getSelectedDateCorner() {
+  const selectedOption = document.querySelector('.corner-option.selected');
+  return selectedOption ? selectedOption.getAttribute('data-corner') : 'top-left';
+}
+
 // DOM elements
 const loadingEl = document.getElementById('loading');
 const loadBtn = document.getElementById('load-btn');
@@ -107,6 +143,8 @@ const exportDuration = document.getElementById('export-duration');
 const exportWidth = document.getElementById('export-width');
 const exportHeight = document.getElementById('export-height');
 const exportFps = document.getElementById('export-fps');
+const includeDateOverlay = document.getElementById('include-date-overlay');
+const dateCornerSelector = document.getElementById('date-corner-selector');
 const sizeEstimateValue = document.getElementById('size-estimate-value');
 const exportProgress = document.getElementById('export-progress');
 const progressFill = document.getElementById('progress-fill');
@@ -1380,6 +1418,21 @@ exportFps.addEventListener('change', () => {
 exportStartDate.addEventListener('change', scheduleURLUpdate);
 exportEndDate.addEventListener('change', scheduleURLUpdate);
 
+// Date overlay controls
+includeDateOverlay.addEventListener('change', () => {
+  dateCornerSelector.style.display = includeDateOverlay.checked ? 'block' : 'none';
+  scheduleURLUpdate();
+});
+
+// Corner selector options
+document.querySelectorAll('.corner-option').forEach(option => {
+  option.addEventListener('click', () => {
+    document.querySelectorAll('.corner-option').forEach(opt => opt.classList.remove('selected'));
+    option.classList.add('selected');
+    scheduleURLUpdate();
+  });
+});
+
 // Initialize the estimate on load
 updateGifSizeEstimate();
 
@@ -1423,7 +1476,7 @@ exportBtn.addEventListener('click', async () => {
       exportStatus.textContent = message;
     };
 
-    // Export GIF with capture box bounds
+    // Export GIF with capture box bounds and date overlay settings
     const blob = await gifExporter.export({
       startDate,
       endDate,
@@ -1432,7 +1485,12 @@ exportBtn.addEventListener('click', async () => {
       height,
       fps,
       quality: 10,
-      captureBox: captureBox.bounds // Pass the capture box bounds
+      captureBox: captureBox.bounds, // Pass the capture box bounds
+      dateOverlay: includeDateOverlay.checked ? {
+        enabled: true,
+        corner: getSelectedDateCorner(),
+        color: getDominantActivityColor()
+      } : { enabled: false }
     });
 
     // Store the blob and filename
@@ -1528,6 +1586,12 @@ function encodeStateToURL() {
     params.set('gifEnd', exportEndDate.value);
   }
 
+  // Date overlay settings
+  if (includeDateOverlay.checked) {
+    params.set('dateOverlay', 'true');
+    params.set('dateCorner', getSelectedDateCorner());
+  }
+
   // Animation current time
   if (animationController && animationController.currentTime) {
     params.set('time', animationController.currentTime.toISOString().split('T')[0]);
@@ -1621,6 +1685,23 @@ function restoreStateFromURL() {
   }
   if (params.has('gifEnd')) {
     exportEndDate.value = params.get('gifEnd');
+  }
+
+  // Date overlay settings
+  if (params.has('dateOverlay') && params.get('dateOverlay') === 'true') {
+    includeDateOverlay.checked = true;
+    dateCornerSelector.style.display = 'block';
+
+    if (params.has('dateCorner')) {
+      const corner = params.get('dateCorner');
+      document.querySelectorAll('.corner-option').forEach(option => {
+        if (option.getAttribute('data-corner') === corner) {
+          option.classList.add('selected');
+        } else {
+          option.classList.remove('selected');
+        }
+      });
+    }
   }
 
   // Animation time
