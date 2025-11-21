@@ -539,6 +539,7 @@ Potential features for contributions:
 - **[html2canvas](https://html2canvas.hertzen.com/)** - DOM capture by Niklas von Hertzen
 - **[Vite](https://vitejs.dev/)** - Build tool by Evan You
 - **[Font Awesome](https://fontawesome.com/)** - Icons
+- Built with **[Claude Code](https://claude.ai/code)** - Anthropic's AI-powered coding assistant
 
 ---
 

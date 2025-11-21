@@ -109,7 +109,81 @@ function getDominantActivityColor() {
 // Get selected corner for date overlay
 function getSelectedDateCorner() {
   const selectedOption = document.querySelector('.corner-option.selected');
-  return selectedOption ? selectedOption.getAttribute('data-corner') : 'top-left';
+  return selectedOption ? selectedOption.getAttribute('data-corner') : 'bottom-right';
+}
+
+// Format date based on selected format
+function formatDateOverlay(date, format = null) {
+  if (!date) return '';
+
+  // Use current selection if no format specified
+  if (!format) {
+    format = dateFormatSelect ? dateFormatSelect.value : 'DD MMMM YYYY';
+  }
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const monthIndex = date.getMonth();
+  const year = date.getFullYear();
+  const month2Digit = String(monthIndex + 1).padStart(2, '0');
+
+  const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  switch (format) {
+    case 'DD-MM-YYYY':
+      return `${day}-${month2Digit}-${year}`;
+    case 'DD MMM YYYY':
+      return `${day} ${monthsShort[monthIndex]} ${year}`;
+    case 'DD MMMM YYYY':
+      return `${day} ${monthsFull[monthIndex]} ${year}`;
+    default:
+      return `${day} ${monthsFull[monthIndex]} ${year}`;
+  }
+}
+
+// Update date format dropdown with examples from current animation date
+function updateDateFormatOptions() {
+  if (!animationController || !animationController.currentTime || !dateFormatSelect) return;
+
+  const exampleDate = animationController.currentTime;
+  const formats = ['DD-MM-YYYY', 'DD MMM YYYY', 'DD MMMM YYYY'];
+  const currentValue = dateFormatSelect.value;
+
+  // Update each option with an example
+  Array.from(dateFormatSelect.options).forEach((option, index) => {
+    const format = formats[index];
+    const example = formatDateOverlay(exampleDate, format);
+    option.textContent = example;
+    option.value = format;
+  });
+
+  // Restore the selected value
+  dateFormatSelect.value = currentValue;
+}
+
+// Update the date preview overlay on the map
+function updateDatePreview() {
+  if (!includeDateOverlay.checked || !animationController || !animationController.currentTime) {
+    datePreviewOverlay.classList.remove('visible');
+    return;
+  }
+
+  // Show the preview
+  datePreviewOverlay.classList.add('visible');
+
+  // Update the date text
+  datePreviewOverlay.textContent = formatDateOverlay(animationController.currentTime);
+
+  // Update the corner position
+  const corner = getSelectedDateCorner();
+  datePreviewOverlay.className = `visible ${corner}`;
+
+  // Update the color to match dominant activity
+  const color = getDominantActivityColor();
+  datePreviewOverlay.style.color = color;
+
+  // Update dropdown options with current date
+  updateDateFormatOptions();
 }
 
 // DOM elements
@@ -145,6 +219,8 @@ const exportHeight = document.getElementById('export-height');
 const exportFps = document.getElementById('export-fps');
 const includeDateOverlay = document.getElementById('include-date-overlay');
 const dateCornerSelector = document.getElementById('date-corner-selector');
+const dateFormatSelect = document.getElementById('date-format-select');
+const datePreviewOverlay = document.getElementById('date-preview-overlay');
 const sizeEstimateValue = document.getElementById('size-estimate-value');
 const exportProgress = document.getElementById('export-progress');
 const progressFill = document.getElementById('progress-fill');
@@ -390,6 +466,9 @@ function updateStats() {
   statCount.textContent = filteredActivities.length;
   statDistance.textContent = (stats.totalDistance / 1000).toFixed(2);
   statTypes.textContent = stats.types.size;
+
+  // Update date preview color (in case dominant activity changed)
+  updateDatePreview();
 }
 
 function populateActivityTypes() {
@@ -715,6 +794,7 @@ function formatDateForInput(date) {
 function updateTimeDisplay(date) {
   if (!date) {
     timeDisplay.textContent = '--/--/----';
+    updateDatePreview(); // Update preview even when no date
     return;
   }
   timeDisplay.textContent = date.toLocaleDateString('en-US', {
@@ -722,6 +802,7 @@ function updateTimeDisplay(date) {
     month: 'short',
     day: 'numeric'
   });
+  updateDatePreview(); // Update the date preview on the map
 }
 
 function updateTimelineSlider() {
@@ -1421,6 +1502,7 @@ exportEndDate.addEventListener('change', scheduleURLUpdate);
 // Date overlay controls
 includeDateOverlay.addEventListener('change', () => {
   dateCornerSelector.style.display = includeDateOverlay.checked ? 'block' : 'none';
+  updateDatePreview();
   scheduleURLUpdate();
 });
 
@@ -1429,8 +1511,15 @@ document.querySelectorAll('.corner-option').forEach(option => {
   option.addEventListener('click', () => {
     document.querySelectorAll('.corner-option').forEach(opt => opt.classList.remove('selected'));
     option.classList.add('selected');
+    updateDatePreview();
     scheduleURLUpdate();
   });
+});
+
+// Date format selector
+dateFormatSelect.addEventListener('change', () => {
+  updateDatePreview();
+  scheduleURLUpdate();
 });
 
 // Initialize the estimate on load
@@ -1489,7 +1578,8 @@ exportBtn.addEventListener('click', async () => {
       dateOverlay: includeDateOverlay.checked ? {
         enabled: true,
         corner: getSelectedDateCorner(),
-        color: getDominantActivityColor()
+        color: getDominantActivityColor(),
+        format: dateFormatSelect.value
       } : { enabled: false }
     });
 
@@ -1590,6 +1680,7 @@ function encodeStateToURL() {
   if (includeDateOverlay.checked) {
     params.set('dateOverlay', 'true');
     params.set('dateCorner', getSelectedDateCorner());
+    params.set('dateFormat', dateFormatSelect.value);
   }
 
   // Animation current time
@@ -1701,6 +1792,13 @@ function restoreStateFromURL() {
           option.classList.remove('selected');
         }
       });
+    }
+
+    if (params.has('dateFormat')) {
+      const format = params.get('dateFormat');
+      if (['DD-MM-YYYY', 'DD MMM YYYY', 'DD MMMM YYYY'].includes(format)) {
+        dateFormatSelect.value = format;
+      }
     }
   }
 

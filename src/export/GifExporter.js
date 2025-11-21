@@ -282,7 +282,7 @@ export class GifExporter {
 
     // Render date overlay if enabled
     if (dateOverlay.enabled && currentTime) {
-      this._renderDateOverlay(ctx, width, height, currentTime, dateOverlay.corner, dateOverlay.color);
+      this._renderDateOverlay(ctx, width, height, currentTime, dateOverlay.corner, dateOverlay.color, dateOverlay.format);
     }
 
     return canvas;
@@ -395,7 +395,7 @@ export class GifExporter {
 
     // Render date overlay if enabled
     if (dateOverlay.enabled && currentTime) {
-      this._renderDateOverlay(ctx, width, height, currentTime, dateOverlay.corner, dateOverlay.color);
+      this._renderDateOverlay(ctx, width, height, currentTime, dateOverlay.corner, dateOverlay.color, dateOverlay.format);
     }
 
     return canvas;
@@ -562,23 +562,38 @@ export class GifExporter {
   }
 
   /**
-   * Format date as "27 May 1983"
+   * Format date based on format string
    */
-  _formatDate(date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const day = date.getDate();
-    const month = months[date.getMonth()];
+  _formatDate(date, format = 'DD MMMM YYYY') {
+    if (!date) return '';
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const monthIndex = date.getMonth();
     const year = date.getFullYear();
-    return `${day} ${month} ${year}`;
+    const month2Digit = String(monthIndex + 1).padStart(2, '0');
+
+    const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    switch (format) {
+      case 'DD-MM-YYYY':
+        return `${day}-${month2Digit}-${year}`;
+      case 'DD MMM YYYY':
+        return `${day} ${monthsShort[monthIndex]} ${year}`;
+      case 'DD MMMM YYYY':
+        return `${day} ${monthsFull[monthIndex]} ${year}`;
+      default:
+        return `${day} ${monthsFull[monthIndex]} ${year}`;
+    }
   }
 
   /**
    * Render date overlay on canvas
    */
-  _renderDateOverlay(ctx, width, height, date, corner, color) {
+  _renderDateOverlay(ctx, width, height, date, corner, color, format = 'DD MMMM YYYY') {
     if (!date) return;
 
-    const dateText = this._formatDate(date);
+    const dateText = this._formatDate(date, format);
     const padding = Math.max(15, width * 0.015); // Responsive padding (min 15px)
     const fontSize = Math.max(16, width * 0.02); // Responsive font size (min 16px)
 

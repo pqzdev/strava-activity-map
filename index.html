@@ -369,6 +369,42 @@
       pointer-events: none;
     }
 
+    /* Date preview overlay on map */
+    #date-preview-overlay {
+      position: absolute;
+      z-index: 999;
+      pointer-events: none;
+      display: none;
+      font-weight: 600;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3);
+      font-size: 18px;
+    }
+
+    #date-preview-overlay.visible {
+      display: block;
+    }
+
+    #date-preview-overlay.top-left {
+      top: 15px;
+      left: 15px;
+    }
+
+    #date-preview-overlay.top-right {
+      top: 15px;
+      right: 15px;
+    }
+
+    #date-preview-overlay.bottom-left {
+      bottom: 15px;
+      left: 15px;
+    }
+
+    #date-preview-overlay.bottom-right {
+      bottom: 15px;
+      right: 15px;
+    }
+
     .aspect-ratio-pills {
       display: flex;
       flex-wrap: wrap;
@@ -404,18 +440,20 @@
     .corner-selector {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
+      gap: 6px;
       margin-top: 8px;
+      max-width: 100px;
     }
 
     .corner-option {
       aspect-ratio: 1;
       border: 2px solid #ddd;
-      border-radius: 6px;
+      border-radius: 4px;
       cursor: pointer;
       position: relative;
       background: #f9f9f9;
       transition: all 0.2s;
+      min-height: 40px;
     }
 
     .corner-option:hover {
@@ -430,30 +468,30 @@
 
     .corner-option .corner-indicator {
       position: absolute;
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       background: #2196F3;
       border-radius: 2px;
     }
 
     .corner-option[data-corner="top-left"] .corner-indicator {
-      top: 6px;
-      left: 6px;
+      top: 4px;
+      left: 4px;
     }
 
     .corner-option[data-corner="top-right"] .corner-indicator {
-      top: 6px;
-      right: 6px;
+      top: 4px;
+      right: 4px;
     }
 
     .corner-option[data-corner="bottom-left"] .corner-indicator {
-      bottom: 6px;
-      left: 6px;
+      bottom: 4px;
+      left: 4px;
     }
 
     .corner-option[data-corner="bottom-right"] .corner-indicator {
-      bottom: 6px;
-      right: 6px;
+      bottom: 4px;
+      right: 4px;
     }
 
     .date-overlay-checkbox {
@@ -600,6 +638,7 @@
       <div class="capture-box-handle sw"></div>
       <div class="capture-box-handle se"></div>
     </div>
+    <div id="date-preview-overlay" class="bottom-right"></div>
   </div>
 
   <div id="controls">
@@ -731,7 +770,7 @@
         <div id="date-corner-selector" style="display: none;">
           <label style="font-size: 13px; color: #666; margin-top: 10px; display: block;">Corner Position</label>
           <div class="corner-selector">
-            <div class="corner-option selected" data-corner="top-left" title="Top Left">
+            <div class="corner-option" data-corner="top-left" title="Top Left">
               <div class="corner-indicator"></div>
             </div>
             <div class="corner-option" data-corner="top-right" title="Top Right">
@@ -740,10 +779,16 @@
             <div class="corner-option" data-corner="bottom-left" title="Bottom Left">
               <div class="corner-indicator"></div>
             </div>
-            <div class="corner-option" data-corner="bottom-right" title="Bottom Right">
+            <div class="corner-option selected" data-corner="bottom-right" title="Bottom Right">
               <div class="corner-indicator"></div>
             </div>
           </div>
+          <label for="date-format-select" style="font-size: 13px; color: #666; margin-top: 10px; display: block;">Date Format</label>
+          <select id="date-format-select" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+            <option value="DD-MM-YYYY">DD-MM-YYYY</option>
+            <option value="DD MMM YYYY">DD MMM YYYY</option>
+            <option value="DD MMMM YYYY">DD MMMM YYYY</option>
+          </select>
         </div>
       </div>
 
