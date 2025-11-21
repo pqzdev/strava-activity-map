@@ -25,74 +25,47 @@ let activities = [];
 let polylines = [];
 let animationController = null;
 let gifExporter = null;
-let currentColorScheme = 'strava';
 let captureBox = {
   ratio: 'max',
   bounds: null
 };
 
-// Color schemes
-const COLOR_SCHEMES = {
-  'strava': {
-    name: 'Strava',
-    colors: {
-      'Run': '#fc4c02',
-      'Ride': '#0066cc',
-      'Swim': '#00cccc',
-      'Walk': '#66cc00',
-      'Hike': '#996600',
-      'default': '#888888'
-    }
-  },
-  'sunset': {
-    name: 'Sunset',
-    colors: {
-      'Run': '#ff6b35',
-      'Ride': '#f7931e',
-      'Swim': '#fdc70d',
-      'Walk': '#f3a683',
-      'Hike': '#ee5a6f',
-      'default': '#d8b4a0'
-    }
-  },
-  'ocean': {
-    name: 'Ocean',
-    colors: {
-      'Run': '#006994',
-      'Ride': '#007ea7',
-      'Swim': '#00a8cc',
-      'Walk': '#60d394',
-      'Hike': '#aaf683',
-      'default': '#86a5b5'
-    }
-  },
-  'forest': {
-    name: 'Forest',
-    colors: {
-      'Run': '#2d5016',
-      'Ride': '#4a7c1e',
-      'Swim': '#6ba82f',
-      'Walk': '#a0c334',
-      'Hike': '#d4e157',
-      'default': '#8d9e6e'
-    }
-  },
-  'monochrome': {
-    name: 'Monochrome',
-    colors: {
-      'Run': '#1a1a1a',
-      'Ride': '#333333',
-      'Swim': '#4d4d4d',
-      'Walk': '#666666',
-      'Hike': '#808080',
-      'default': '#999999'
-    }
-  }
+// Color palette for selection
+const COLOR_PALETTE = [
+  { name: 'Strava Orange', value: '#fc4c02' },
+  { name: 'Strava Blue', value: '#0066cc' },
+  { name: 'Cyan', value: '#00cccc' },
+  { name: 'Green', value: '#66cc00' },
+  { name: 'Brown', value: '#996600' },
+  { name: 'Red', value: '#e74c3c' },
+  { name: 'Purple', value: '#9b59b6' },
+  { name: 'Pink', value: '#e91e63' },
+  { name: 'Yellow', value: '#f1c40f' },
+  { name: 'Lime', value: '#d4e157' },
+  { name: 'Teal', value: '#00a8cc' },
+  { name: 'Navy', value: '#006994' },
+  { name: 'Forest', value: '#2d5016' },
+  { name: 'Orange', value: '#ff6b35' },
+  { name: 'Gray', value: '#888888' },
+  { name: 'Black', value: '#1a1a1a' }
+];
+
+// Default colors for common activity types
+const DEFAULT_ACTIVITY_COLORS = {
+  'Run': '#fc4c02',
+  'Ride': '#0066cc',
+  'Swim': '#00cccc',
+  'Walk': '#66cc00',
+  'Hike': '#996600',
+  'default': '#888888'
 };
+
+// Custom colors per activity type (user can change these)
+let customActivityColors = {};
 
 // Get current activity colors
 function getActivityColors() {
-  return COLOR_SCHEMES[currentColorScheme].colors;
+  return customActivityColors;
 }
 
 // DOM elements
@@ -299,47 +272,54 @@ function populateActivityTypes() {
   activityTypeList.style.display = 'none';
 }
 
-// Populate color schemes
+// Populate color pickers for each activity type
 function populateColorSchemes() {
   const container = document.getElementById('color-schemes-list');
   container.innerHTML = '';
 
-  Object.keys(COLOR_SCHEMES).forEach(schemeKey => {
-    const scheme = COLOR_SCHEMES[schemeKey];
+  // Get unique activity types from loaded activities
+  const activityTypes = [...new Set(activities.map(a => a.type))].sort();
 
-    const label = document.createElement('label');
-    label.style.cssText = 'display: flex; align-items: center; margin: 8px 0; cursor: pointer;';
+  // Initialize custom colors with defaults
+  activityTypes.forEach(type => {
+    if (!customActivityColors[type]) {
+      customActivityColors[type] = DEFAULT_ACTIVITY_COLORS[type] || DEFAULT_ACTIVITY_COLORS.default;
+    }
+  });
 
-    const radio = document.createElement('input');
-    radio.type = 'radio';
-    radio.name = 'color-scheme';
-    radio.value = schemeKey;
-    radio.checked = schemeKey === currentColorScheme;
-    radio.style.marginRight = '8px';
+  // Create color picker for each activity type
+  activityTypes.forEach(type => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin: 10px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;';
 
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = scheme.name;
-    nameSpan.style.marginRight = '10px';
+    const typeLabel = document.createElement('span');
+    typeLabel.textContent = type;
+    typeLabel.style.cssText = 'font-weight: 500; min-width: 80px;';
 
-    // Color preview
-    const preview = document.createElement('div');
-    preview.style.cssText = 'display: flex; gap: 2px; margin-left: auto;';
+    const colorSelect = document.createElement('select');
+    colorSelect.style.cssText = 'flex: 1; margin: 0 10px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;';
 
-    // Show 3 sample colors
-    const sampleTypes = ['Run', 'Ride', 'Swim'];
-    sampleTypes.forEach(type => {
-      const colorBox = document.createElement('div');
-      colorBox.style.cssText = `width: 16px; height: 16px; background: ${scheme.colors[type]}; border-radius: 2px;`;
-      preview.appendChild(colorBox);
+    // Add color options
+    COLOR_PALETTE.forEach(color => {
+      const option = document.createElement('option');
+      option.value = color.value;
+      option.textContent = color.name;
+      option.style.cssText = `background: ${color.value}; color: white;`;
+      if (customActivityColors[type] === color.value) {
+        option.selected = true;
+      }
+      colorSelect.appendChild(option);
     });
 
-    label.appendChild(radio);
-    label.appendChild(nameSpan);
-    label.appendChild(preview);
+    // Color preview box
+    const preview = document.createElement('div');
+    preview.style.cssText = `width: 30px; height: 30px; background: ${customActivityColors[type]}; border-radius: 4px; border: 2px solid #ddd;`;
 
-    label.addEventListener('click', () => {
-      radio.checked = true;
-      currentColorScheme = schemeKey;
+    // Update color when selection changes
+    colorSelect.addEventListener('change', () => {
+      const newColor = colorSelect.value;
+      customActivityColors[type] = newColor;
+      preview.style.background = newColor;
 
       // Re-render activities with new colors
       if (animationController) {
@@ -349,8 +329,55 @@ function populateColorSchemes() {
       }
     });
 
-    container.appendChild(label);
+    row.appendChild(typeLabel);
+    row.appendChild(colorSelect);
+    row.appendChild(preview);
+
+    container.appendChild(row);
   });
+
+  // Add default color picker
+  const defaultRow = document.createElement('div');
+  defaultRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin: 10px 0; padding: 8px; background: #f0f0f0; border-radius: 4px;';
+
+  const defaultLabel = document.createElement('span');
+  defaultLabel.textContent = 'Other';
+  defaultLabel.style.cssText = 'font-weight: 500; min-width: 80px; font-style: italic;';
+
+  const defaultSelect = document.createElement('select');
+  defaultSelect.style.cssText = 'flex: 1; margin: 0 10px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;';
+
+  COLOR_PALETTE.forEach(color => {
+    const option = document.createElement('option');
+    option.value = color.value;
+    option.textContent = color.name;
+    option.style.cssText = `background: ${color.value}; color: white;`;
+    if ((customActivityColors.default || DEFAULT_ACTIVITY_COLORS.default) === color.value) {
+      option.selected = true;
+    }
+    defaultSelect.appendChild(option);
+  });
+
+  const defaultPreview = document.createElement('div');
+  defaultPreview.style.cssText = `width: 30px; height: 30px; background: ${customActivityColors.default || DEFAULT_ACTIVITY_COLORS.default}; border-radius: 4px; border: 2px solid #ddd;`;
+
+  defaultSelect.addEventListener('change', () => {
+    const newColor = defaultSelect.value;
+    customActivityColors.default = newColor;
+    defaultPreview.style.background = newColor;
+
+    if (animationController) {
+      initializeAnimation();
+    } else {
+      renderActivities();
+    }
+  });
+
+  defaultRow.appendChild(defaultLabel);
+  defaultRow.appendChild(defaultSelect);
+  defaultRow.appendChild(defaultPreview);
+
+  container.appendChild(defaultRow);
 }
 
 // Get selected activity types
@@ -378,13 +405,16 @@ function getFilteredActivities() {
 function handleActivityTypeChange() {
   const checkboxes = document.querySelectorAll('.activity-type-checkbox');
   const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+  const allPill = document.querySelector('.activity-pill.all-pill');
 
   // If any individual type is checked, uncheck "All"
   if (anyChecked) {
     activityTypeAll.checked = false;
+    allPill.classList.remove('selected');
   } else {
     // If no individual types are checked, check "All Activities"
     activityTypeAll.checked = true;
+    allPill.classList.add('selected');
     // Reset all pills to unselected
     document.querySelectorAll('.activity-pill:not(.all-pill)').forEach(pill => {
       pill.classList.remove('selected');
@@ -443,8 +473,12 @@ function initializeAnimation() {
   // Filter activities based on selected types and privacy settings
   const filtered = getFilteredActivities();
 
-  // Clear existing animation
+  // Preserve current time if controller exists
+  let preservedTime = null;
+  let wasPlaying = false;
   if (animationController) {
+    preservedTime = animationController.currentTime;
+    wasPlaying = animationController.isPlaying;
     animationController.destroy();
   }
 
@@ -464,6 +498,16 @@ function initializeAnimation() {
   animationController.onActivityAppear = (activity) => {
     console.log('New activity:', activity.name);
   };
+
+  // Restore previous time position if it was set
+  if (preservedTime && preservedTime >= animationController.startTime && preservedTime <= animationController.endTime) {
+    animationController.seek(preservedTime);
+    if (wasPlaying) {
+      animationController.play();
+      playBtn.disabled = true;
+      pauseBtn.disabled = false;
+    }
+  }
 
   // Show animation controls
   animationControlsEl.style.display = 'block';
@@ -530,8 +574,132 @@ function updateExportDimensions() {
 // Initialize capture box
 function initializeCaptureBox() {
   const captureBoxEl = document.getElementById('capture-box');
+  const captureOverlay = document.getElementById('capture-overlay');
   updateCaptureBox('max');
   captureBoxEl.classList.add('active');
+  captureOverlay.classList.add('active');
+  setupCaptureBoxResize();
+}
+
+// Setup capture box resize functionality
+function setupCaptureBoxResize() {
+  const captureBoxEl = document.getElementById('capture-box');
+  const handles = captureBoxEl.querySelectorAll('.capture-box-handle');
+  const mapContainer = map.getContainer();
+
+  let isResizing = false;
+  let currentHandle = null;
+  let startX, startY, startWidth, startHeight, startLeft, startTop;
+
+  handles.forEach(handle => {
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      isResizing = true;
+      currentHandle = handle.classList[1]; // Get the position class (nw, ne, sw, se)
+
+      startX = e.clientX;
+      startY = e.clientY;
+      startWidth = captureBoxEl.offsetWidth;
+      startHeight = captureBoxEl.offsetHeight;
+      startLeft = captureBoxEl.offsetLeft;
+      startTop = captureBoxEl.offsetTop;
+
+      // Disable map dragging
+      map.dragging.disable();
+
+      // Set to free mode when manually resizing
+      captureBox.ratio = 'free';
+    });
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+
+    e.preventDefault();
+
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    let newWidth = startWidth;
+    let newHeight = startHeight;
+    let newLeft = startLeft;
+    let newTop = startTop;
+
+    // Calculate new dimensions based on which handle is being dragged
+    switch (currentHandle) {
+      case 'se': // Bottom-right
+        newWidth = startWidth + dx;
+        newHeight = startHeight + dy;
+        break;
+      case 'sw': // Bottom-left
+        newWidth = startWidth - dx;
+        newHeight = startHeight + dy;
+        newLeft = startLeft + dx;
+        break;
+      case 'ne': // Top-right
+        newWidth = startWidth + dx;
+        newHeight = startHeight - dy;
+        newTop = startTop + dy;
+        break;
+      case 'nw': // Top-left
+        newWidth = startWidth - dx;
+        newHeight = startHeight - dy;
+        newLeft = startLeft + dx;
+        newTop = startTop + dy;
+        break;
+    }
+
+    // Constrain to map bounds
+    const mapWidth = mapContainer.clientWidth;
+    const mapHeight = mapContainer.clientHeight;
+
+    newWidth = Math.max(100, Math.min(newWidth, mapWidth - newLeft));
+    newHeight = Math.max(100, Math.min(newHeight, mapHeight - newTop));
+    newLeft = Math.max(0, Math.min(newLeft, mapWidth - 100));
+    newTop = Math.max(0, Math.min(newTop, mapHeight - 100));
+
+    // Apply new dimensions
+    captureBoxEl.style.width = `${newWidth}px`;
+    captureBoxEl.style.height = `${newHeight}px`;
+    captureBoxEl.style.left = `${newLeft}px`;
+    captureBoxEl.style.top = `${newTop}px`;
+
+    // Update overlay to match box position
+    const captureOverlay = document.getElementById('capture-overlay');
+    captureOverlay.style.left = `${newLeft}px`;
+    captureOverlay.style.top = `${newTop}px`;
+    captureOverlay.style.width = `${newWidth}px`;
+    captureOverlay.style.height = `${newHeight}px`;
+
+    // Update label
+    const labelEl = document.getElementById('capture-box-label');
+    const aspectRatio = (newWidth / newHeight).toFixed(2);
+    labelEl.textContent = `${Math.round(newWidth)}×${Math.round(newHeight)} (${aspectRatio}:1)`;
+
+    // Update export dimensions to match capture box
+    exportWidth.value = Math.round(newWidth);
+    exportHeight.value = Math.round(newHeight);
+
+    // Store bounds
+    captureBox.bounds = {
+      left: newLeft,
+      top: newTop,
+      width: newWidth,
+      height: newHeight
+    };
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      currentHandle = null;
+
+      // Re-enable map dragging
+      map.dragging.enable();
+    }
+  });
 }
 
 // Update capture box based on aspect ratio
@@ -596,6 +764,13 @@ function updateCaptureBox(ratio) {
   captureBoxEl.style.width = `${width}px`;
   captureBoxEl.style.height = `${height}px`;
 
+  // Update overlay to match box position
+  const captureOverlay = document.getElementById('capture-overlay');
+  captureOverlay.style.left = `${left}px`;
+  captureOverlay.style.top = `${top}px`;
+  captureOverlay.style.width = `${width}px`;
+  captureOverlay.style.height = `${height}px`;
+
   // Update label
   const labelEl = document.getElementById('capture-box-label');
   const aspectRatio = (width / height).toFixed(2);
@@ -631,10 +806,12 @@ activityTypeAll.parentElement.addEventListener('click', (e) => {
 
   const checkboxes = document.querySelectorAll('.activity-type-checkbox');
   const pills = document.querySelectorAll('.activity-pill:not(.all-pill)');
+  const allPill = activityTypeAll.parentElement;
 
   if (!activityTypeAll.checked) {
     // Selecting "All" - deselect individual types
     activityTypeAll.checked = true;
+    allPill.classList.add('selected');
     checkboxes.forEach(cb => {
       cb.checked = false;
     });
@@ -644,6 +821,7 @@ activityTypeAll.parentElement.addEventListener('click', (e) => {
   } else {
     // Deselecting "All" - select all individual types
     activityTypeAll.checked = false;
+    allPill.classList.remove('selected');
     checkboxes.forEach(cb => {
       cb.checked = true;
     });

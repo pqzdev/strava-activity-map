@@ -288,11 +288,28 @@
       font-weight: 600;
     }
 
+    /* Capture overlay - shades everything outside the capture box */
+    #capture-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: transparent;
+      pointer-events: none;
+      z-index: 998;
+    }
+
+    #capture-overlay.active {
+      display: block;
+      box-shadow: 0 0 0 9999px rgba(252, 76, 2, 0.3);
+    }
+
     /* Capture area box */
     #capture-box {
       position: absolute;
       border: 3px dashed #fc4c02;
-      background: rgba(252, 76, 2, 0.1);
+      background: transparent;
       pointer-events: none;
       z-index: 999;
       display: none;
@@ -459,6 +476,7 @@
   </div>
 
   <div id="map">
+    <div id="capture-overlay" style="display: none;"></div>
     <div id="capture-box">
       <div class="capture-box-label" id="capture-box-label">Capture Area</div>
       <div class="capture-box-handle nw"></div>
@@ -486,7 +504,7 @@
     <div class="control-group">
       <label>Activity Types</label>
       <div class="activity-type-pills">
-        <label class="activity-pill all-pill">
+        <label class="activity-pill all-pill selected">
           <input type="checkbox" id="activity-type-all" checked>
           <span>All</span>
         </label>
