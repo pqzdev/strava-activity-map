@@ -216,6 +216,15 @@ function handleActivitiesLoaded(loadedActivities) {
   // Initialize animation
   initializeAnimation();
 
+  // Set default export dates (only on initial load)
+  if (animationController.startTime && animationController.endTime) {
+    exportStartDate.value = formatDateForInput(animationController.startTime);
+    exportEndDate.value = formatDateForInput(animationController.endTime);
+  }
+
+  // Set default export dimensions based on current map size (only on initial load)
+  updateExportDimensions();
+
   // Initialize capture box
   initializeCaptureBox();
 
@@ -528,15 +537,6 @@ function initializeAnimation() {
 
   // Initialize GIF exporter
   gifExporter = new GifExporter(animationController, map);
-
-  // Set default export dates
-  if (animationController.startTime && animationController.endTime) {
-    exportStartDate.value = formatDateForInput(animationController.startTime);
-    exportEndDate.value = formatDateForInput(animationController.endTime);
-  }
-
-  // Set default export dimensions based on current map size
-  updateExportDimensions();
 
   // Show export controls
   exportControlsEl.style.display = 'block';
