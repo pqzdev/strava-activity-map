@@ -604,6 +604,9 @@ function setupCaptureBoxResize() {
   const handles = captureBoxEl.querySelectorAll('.capture-box-handle');
   const mapContainer = map.getContainer();
 
+  // Buffer margin from map edges (in pixels)
+  const MARGIN = 20;
+
   let isResizing = false;
   let isDragging = false;
   let currentHandle = null;
@@ -724,47 +727,107 @@ function setupCaptureBoxResize() {
       newLeft = startLeft + dx;
       newTop = startTop + dy;
 
-      // Constrain to map bounds
+      // Constrain to map bounds with margin
       const mapWidth = mapContainer.clientWidth;
       const mapHeight = mapContainer.clientHeight;
 
-      newLeft = Math.max(0, Math.min(newLeft, mapWidth - startWidth));
-      newTop = Math.max(0, Math.min(newTop, mapHeight - startHeight));
+      newLeft = Math.max(MARGIN, Math.min(newLeft, mapWidth - startWidth - MARGIN));
+      newTop = Math.max(MARGIN, Math.min(newTop, mapHeight - startHeight - MARGIN));
 
     } else if (isResizing) {
       // Resizing with handles
-      // Calculate new dimensions based on which handle is being dragged
-      switch (currentHandle) {
-        case 'se': // Bottom-right
-          newWidth = startWidth + dx;
-          newHeight = startHeight + dy;
-          break;
-        case 'sw': // Bottom-left
-          newWidth = startWidth - dx;
-          newHeight = startHeight + dy;
-          newLeft = startLeft + dx;
-          break;
-        case 'ne': // Top-right
-          newWidth = startWidth + dx;
-          newHeight = startHeight - dy;
-          newTop = startTop + dy;
-          break;
-        case 'nw': // Top-left
-          newWidth = startWidth - dx;
-          newHeight = startHeight - dy;
-          newLeft = startLeft + dx;
-          newTop = startTop + dy;
-          break;
+      // Determine if aspect ratio should be locked
+      const lockAspectRatio = captureBox.ratio === 'square' || captureBox.ratio === 'vertical' || captureBox.ratio === 'horizontal';
+      let targetAspectRatio = null;
+
+      if (lockAspectRatio) {
+        // Calculate target aspect ratio based on mode
+        if (captureBox.ratio === 'square') {
+          targetAspectRatio = 1; // 1:1
+        } else if (captureBox.ratio === 'vertical') {
+          targetAspectRatio = 9 / 16; // 9:16
+        } else if (captureBox.ratio === 'horizontal') {
+          targetAspectRatio = 16 / 9; // 16:9
+        }
       }
 
-      // Constrain to map bounds
+      // Calculate new dimensions based on which handle is being dragged
+      if (lockAspectRatio && targetAspectRatio) {
+        // For locked aspect ratio, calculate based on the dominant dimension
+        const totalDelta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+
+        switch (currentHandle) {
+          case 'se': // Bottom-right
+            newWidth = startWidth + totalDelta;
+            newHeight = newWidth / targetAspectRatio;
+            break;
+          case 'sw': // Bottom-left
+            newWidth = startWidth - totalDelta;
+            newHeight = newWidth / targetAspectRatio;
+            newLeft = startLeft + totalDelta;
+            break;
+          case 'ne': // Top-right
+            newWidth = startWidth + totalDelta;
+            newHeight = newWidth / targetAspectRatio;
+            newTop = startTop - (newHeight - startHeight);
+            break;
+          case 'nw': // Top-left
+            newWidth = startWidth - totalDelta;
+            newHeight = newWidth / targetAspectRatio;
+            newLeft = startLeft + totalDelta;
+            newTop = startTop - (newHeight - startHeight);
+            break;
+        }
+      } else {
+        // Free resize (no aspect ratio lock)
+        switch (currentHandle) {
+          case 'se': // Bottom-right
+            newWidth = startWidth + dx;
+            newHeight = startHeight + dy;
+            break;
+          case 'sw': // Bottom-left
+            newWidth = startWidth - dx;
+            newHeight = startHeight + dy;
+            newLeft = startLeft + dx;
+            break;
+          case 'ne': // Top-right
+            newWidth = startWidth + dx;
+            newHeight = startHeight - dy;
+            newTop = startTop + dy;
+            break;
+          case 'nw': // Top-left
+            newWidth = startWidth - dx;
+            newHeight = startHeight - dy;
+            newLeft = startLeft + dx;
+            newTop = startTop + dy;
+            break;
+        }
+      }
+
+      // Constrain to map bounds with margin
       const mapWidth = mapContainer.clientWidth;
       const mapHeight = mapContainer.clientHeight;
 
-      newWidth = Math.max(100, Math.min(newWidth, mapWidth - newLeft));
-      newHeight = Math.max(100, Math.min(newHeight, mapHeight - newTop));
-      newLeft = Math.max(0, Math.min(newLeft, mapWidth - 100));
-      newTop = Math.max(0, Math.min(newTop, mapHeight - 100));
+      newWidth = Math.max(100, Math.min(newWidth, mapWidth - newLeft - MARGIN));
+      newHeight = Math.max(100, Math.min(newHeight, mapHeight - newTop - MARGIN));
+      newLeft = Math.max(MARGIN, Math.min(newLeft, mapWidth - 100 - MARGIN));
+      newTop = Math.max(MARGIN, Math.min(newTop, mapHeight - 100 - MARGIN));
+
+      // Re-apply aspect ratio if locked (after constraints)
+      if (lockAspectRatio && targetAspectRatio) {
+        // Recalculate to maintain aspect ratio after constraints
+        const constrainedWidth = newWidth;
+        const constrainedHeight = constrainedWidth / targetAspectRatio;
+
+        // Check if height fits
+        if (constrainedHeight <= mapHeight - newTop - MARGIN) {
+          newHeight = constrainedHeight;
+        } else {
+          // Height is constrained, recalculate width
+          newHeight = Math.min(newHeight, mapHeight - newTop - MARGIN);
+          newWidth = newHeight * targetAspectRatio;
+        }
+      }
     }
 
     // Apply new dimensions
@@ -822,6 +885,9 @@ function updateCaptureBox(ratio) {
   const mapWidth = mapContainer.clientWidth;
   const mapHeight = mapContainer.clientHeight;
 
+  // Buffer margin from map edges (in pixels)
+  const MARGIN = 20;
+
   let width, height;
 
   // Common phone aspect ratios
@@ -830,30 +896,30 @@ function updateCaptureBox(ratio) {
 
   switch (ratio) {
     case 'max':
-      width = mapWidth;
-      height = mapHeight;
+      width = mapWidth - (MARGIN * 2);
+      height = mapHeight - (MARGIN * 2);
       break;
 
     case 'square':
-      const size = Math.min(mapWidth, mapHeight);
-      width = size;
-      height = size;
+      const availableSize = Math.min(mapWidth, mapHeight) - (MARGIN * 2);
+      width = availableSize;
+      height = availableSize;
       break;
 
     case 'vertical':
-      height = mapHeight * 0.9; // 90% of map height
+      height = (mapHeight - MARGIN * 2) * 0.9; // 90% of available height
       width = height * VERTICAL_PHONE;
-      if (width > mapWidth * 0.9) {
-        width = mapWidth * 0.9;
+      if (width > (mapWidth - MARGIN * 2) * 0.9) {
+        width = (mapWidth - MARGIN * 2) * 0.9;
         height = width / VERTICAL_PHONE;
       }
       break;
 
     case 'horizontal':
-      width = mapWidth * 0.9; // 90% of map width
+      width = (mapWidth - MARGIN * 2) * 0.9; // 90% of available width
       height = width / HORIZONTAL_PHONE;
-      if (height > mapHeight * 0.9) {
-        height = mapHeight * 0.9;
+      if (height > (mapHeight - MARGIN * 2) * 0.9) {
+        height = (mapHeight - MARGIN * 2) * 0.9;
         width = height * HORIZONTAL_PHONE;
       }
       break;
@@ -866,9 +932,9 @@ function updateCaptureBox(ratio) {
       break;
   }
 
-  // Center the box
-  const left = (mapWidth - width) / 2;
-  const top = (mapHeight - height) / 2;
+  // Center the box within available space (respecting margins)
+  const left = MARGIN + ((mapWidth - MARGIN * 2) - width) / 2;
+  const top = MARGIN + ((mapHeight - MARGIN * 2) - height) / 2;
 
   const captureBoxEl = document.getElementById('capture-box');
   captureBoxEl.style.left = `${left}px`;
