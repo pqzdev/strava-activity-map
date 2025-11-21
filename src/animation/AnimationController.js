@@ -3,7 +3,7 @@
  * Manages time-based animation of activities on the map
  */
 export class AnimationController {
-  constructor(activities, map, getColorsFn) {
+  constructor(activities, map, getColorsFn, baseOpacity = 0.5) {
     this.activities = activities;
     this.map = map;
     this.getColorsFn = getColorsFn || (() => ({
@@ -14,6 +14,7 @@ export class AnimationController {
       'Hike': '#996600',
       'default': '#888888'
     }));
+    this.baseOpacity = baseOpacity; // Base opacity from activity density
 
     // Sort activities by date
     this.sortedActivities = [...activities].sort((a, b) =>
@@ -34,9 +35,15 @@ export class AnimationController {
     this.fadeoutDuration = 5000; // ms to fade out old activities
     this.maxVisibleActivities = 100; // Limit for performance
 
-    // Opacity settings
-    this.recencyOpacityRange = { min: 0.15, max: 1.0 }; // Most recent = 100%, oldest = 15%
-    this.overlapOpacityRange = { min: 0.15, max: 0.75 }; // Most overlapped = 75%, least = 15%
+    // Opacity settings (scaled by baseOpacity)
+    this.recencyOpacityRange = {
+      min: 0.15 * baseOpacity / 0.5, // Scale relative to default 0.5
+      max: 1.0 * baseOpacity / 0.5
+    };
+    this.overlapOpacityRange = {
+      min: 0.15 * baseOpacity / 0.5,
+      max: 0.75 * baseOpacity / 0.5
+    };
     this.fadeWindowMs = 90 * 24 * 60 * 60 * 1000; // 3 months in ms - activities fade over this period
 
     // Grid for overlap detection (rounded lat/lng to group nearby segments)

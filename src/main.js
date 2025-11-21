@@ -532,6 +532,42 @@ function handleActivityTypeChange() {
   scheduleURLUpdate();
 }
 
+// Calculate optimal opacity based on activity density in capture box
+function calculateActivityOpacity() {
+  if (!captureBox.bounds) return 0.5; // Default if no capture box
+
+  const filtered = getFilteredActivities();
+  const boxBounds = captureBox.bounds;
+
+  // Convert capture box pixel coordinates to map lat/lng bounds
+  const topLeft = map.containerPointToLatLng([boxBounds.left, boxBounds.top]);
+  const bottomRight = map.containerPointToLatLng([boxBounds.left + boxBounds.width, boxBounds.top + boxBounds.height]);
+  const mapBounds = L.latLngBounds(topLeft, bottomRight);
+
+  // Count activities that intersect with capture box
+  let activitiesInBox = 0;
+  filtered.forEach(activity => {
+    const polylineStr = activity.map?.summary_polyline;
+    if (!polylineStr) return;
+
+    const coords = decodePolyline(polylineStr);
+    const hasPointInBox = coords.some(([lat, lng]) => mapBounds.contains([lat, lng]));
+    if (hasPointInBox) activitiesInBox++;
+  });
+
+  // Calculate opacity based on density
+  // Few activities (1-20): high opacity (0.6-0.4)
+  // Medium activities (20-100): medium opacity (0.4-0.25)
+  // Many activities (100+): low opacity (0.25-0.15)
+  if (activitiesInBox <= 20) {
+    return Math.max(0.4, 0.6 - (activitiesInBox / 20) * 0.2);
+  } else if (activitiesInBox <= 100) {
+    return Math.max(0.25, 0.4 - ((activitiesInBox - 20) / 80) * 0.15);
+  } else {
+    return Math.max(0.15, 0.25 - ((activitiesInBox - 100) / 200) * 0.1);
+  }
+}
+
 function renderActivities() {
   // Clear existing polylines
   polylines.forEach(p => p.remove());
@@ -539,6 +575,9 @@ function renderActivities() {
 
   // Filter activities based on selected types and privacy settings
   const filtered = getFilteredActivities();
+
+  // Calculate optimal opacity based on activity density in capture box
+  const baseOpacity = calculateActivityOpacity();
 
   // Render each activity
   filtered.forEach(activity => {
@@ -554,7 +593,7 @@ function renderActivities() {
     const polyline = L.polyline(coords, {
       color: color,
       weight: 1.5,
-      opacity: 0.5
+      opacity: baseOpacity
     }).addTo(map);
 
     // Add popup with activity info
@@ -589,8 +628,11 @@ function initializeAnimation() {
   polylines.forEach(p => p.remove());
   polylines = [];
 
-  // Create new animation controller with color function
-  animationController = new AnimationController(filtered, map, getActivityColors);
+  // Calculate optimal opacity based on activity density in capture box
+  const baseOpacity = calculateActivityOpacity();
+
+  // Create new animation controller with color function and base opacity
+  animationController = new AnimationController(filtered, map, getActivityColors, baseOpacity);
 
   // Set up callbacks
   animationController.onTimeUpdate = (currentTime) => {
