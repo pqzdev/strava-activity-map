@@ -1,6 +1,6 @@
 /**
  * Client-side Strava OAuth Authentication
- * No server required - all credentials stored in sessionStorage
+ * No server required - all credentials stored in localStorage
  */
 
 export class StravaAuth {
@@ -20,8 +20,8 @@ export class StravaAuth {
    * Check if user has provided credentials
    */
   hasCredentials() {
-    const clientId = sessionStorage.getItem(this.storageKeys.clientId);
-    const clientSecret = sessionStorage.getItem(this.storageKeys.clientSecret);
+    const clientId = localStorage.getItem(this.storageKeys.clientId);
+    const clientSecret = localStorage.getItem(this.storageKeys.clientSecret);
     return !!(clientId && clientSecret);
   }
 
@@ -29,8 +29,8 @@ export class StravaAuth {
    * Check if user is authenticated (has valid token)
    */
   isAuthenticated() {
-    const token = sessionStorage.getItem(this.storageKeys.accessToken);
-    const expiresAt = sessionStorage.getItem(this.storageKeys.expiresAt);
+    const token = localStorage.getItem(this.storageKeys.accessToken);
+    const expiresAt = localStorage.getItem(this.storageKeys.expiresAt);
 
     if (!token) return false;
     if (!expiresAt) return true; // No expiry info, assume valid
@@ -42,9 +42,9 @@ export class StravaAuth {
    * Save API credentials (Client ID, Secret, and Scope)
    */
   saveCredentials(clientId, clientSecret, scope = 'read') {
-    sessionStorage.setItem(this.storageKeys.clientId, clientId);
-    sessionStorage.setItem(this.storageKeys.clientSecret, clientSecret);
-    sessionStorage.setItem(this.storageKeys.scope, scope);
+    localStorage.setItem(this.storageKeys.clientId, clientId);
+    localStorage.setItem(this.storageKeys.clientSecret, clientSecret);
+    localStorage.setItem(this.storageKeys.scope, scope);
   }
 
   /**
@@ -52,8 +52,8 @@ export class StravaAuth {
    */
   getCredentials() {
     return {
-      clientId: sessionStorage.getItem(this.storageKeys.clientId),
-      clientSecret: sessionStorage.getItem(this.storageKeys.clientSecret)
+      clientId: localStorage.getItem(this.storageKeys.clientId),
+      clientSecret: localStorage.getItem(this.storageKeys.clientSecret)
     };
   }
 
@@ -178,12 +178,12 @@ export class StravaAuth {
    * Save OAuth tokens
    */
   saveTokens(data) {
-    sessionStorage.setItem(this.storageKeys.accessToken, data.access_token);
-    sessionStorage.setItem(this.storageKeys.refreshToken, data.refresh_token);
-    sessionStorage.setItem(this.storageKeys.expiresAt, (Date.now() + data.expires_in * 1000).toString());
+    localStorage.setItem(this.storageKeys.accessToken, data.access_token);
+    localStorage.setItem(this.storageKeys.refreshToken, data.refresh_token);
+    localStorage.setItem(this.storageKeys.expiresAt, (Date.now() + data.expires_in * 1000).toString());
 
     if (data.athlete) {
-      sessionStorage.setItem(this.storageKeys.athlete, JSON.stringify(data.athlete));
+      localStorage.setItem(this.storageKeys.athlete, JSON.stringify(data.athlete));
     }
   }
 
@@ -193,11 +193,11 @@ export class StravaAuth {
   async getAccessToken() {
     // Check if token is still valid
     if (this.isAuthenticated()) {
-      return sessionStorage.getItem(this.storageKeys.accessToken);
+      return localStorage.getItem(this.storageKeys.accessToken);
     }
 
     // Try to refresh token
-    const refreshToken = sessionStorage.getItem(this.storageKeys.refreshToken);
+    const refreshToken = localStorage.getItem(this.storageKeys.refreshToken);
     if (!refreshToken) {
       throw new Error('No refresh token available. Please authorize again.');
     }
@@ -210,7 +210,7 @@ export class StravaAuth {
    */
   async refreshAccessToken() {
     const { clientId, clientSecret } = this.getCredentials();
-    const refreshToken = sessionStorage.getItem(this.storageKeys.refreshToken);
+    const refreshToken = localStorage.getItem(this.storageKeys.refreshToken);
 
     const response = await fetch('https://www.strava.com/oauth/token', {
       method: 'POST',
@@ -239,7 +239,7 @@ export class StravaAuth {
    * Get athlete info
    */
   getAthlete() {
-    const athleteData = sessionStorage.getItem(this.storageKeys.athlete);
+    const athleteData = localStorage.getItem(this.storageKeys.athlete);
     return athleteData ? JSON.parse(athleteData) : null;
   }
 
@@ -248,7 +248,7 @@ export class StravaAuth {
    */
   clearAll() {
     Object.values(this.storageKeys).forEach(key => {
-      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
     });
   }
 
