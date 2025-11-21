@@ -185,8 +185,8 @@ export class OnboardingUI {
             </div>
 
             <div class="button-row">
-              <button class="btn-secondary" onclick="onboarding.prevStep()">Back</button>
-              <button class="btn-primary" onclick="onboarding.exchangeAuthCode()">Continue</button>
+              <button class="btn-secondary" id="auth-back-btn" onclick="onboarding.prevStep()">Back</button>
+              <button class="btn-primary" id="auth-continue-btn" onclick="onboarding.exchangeAuthCode()" disabled>Continue</button>
             </div>
           </div>
 
@@ -248,6 +248,11 @@ export class OnboardingUI {
     if (stepEl) {
       stepEl.style.display = 'block';
       this.currentStep = step;
+    }
+
+    // Special handling for step 4 (authorization)
+    if (step === 4) {
+      this.initializeStep4();
     }
 
     // Special handling for step 5 (fetch activities)
@@ -364,6 +369,32 @@ export class OnboardingUI {
         <p><small><strong><i class="fas fa-info-circle" style="color: #2196f3;"></i> Note:</strong> Only your public activities will be loaded.</small></p>
       `;
     }
+  }
+
+  /**
+   * Initialize step 4 (authorization)
+   */
+  initializeStep4() {
+    const authCodeInput = document.getElementById('auth-code');
+    const continueBtn = document.getElementById('auth-continue-btn');
+
+    // Function to enable/disable continue button based on input
+    const updateButtonState = () => {
+      const hasText = authCodeInput.value.trim().length > 0;
+      continueBtn.disabled = !hasText;
+    };
+
+    // Check initial state
+    updateButtonState();
+
+    // Add input listener
+    authCodeInput.addEventListener('input', updateButtonState);
+
+    // Also listen for paste event for immediate feedback
+    authCodeInput.addEventListener('paste', () => {
+      // Small delay to let paste complete
+      setTimeout(updateButtonState, 10);
+    });
   }
 
   /**
