@@ -628,8 +628,11 @@ function setupCaptureBoxResize() {
       // Disable map dragging
       map.dragging.disable();
 
-      // Set to free mode when manually resizing
-      captureBox.ratio = 'free';
+      // Only set to free mode if currently in max mode
+      // This preserves aspect ratio locking for square/vertical/horizontal modes
+      if (captureBox.ratio === 'max') {
+        captureBox.ratio = 'free';
+      }
     });
   });
 
@@ -702,8 +705,7 @@ function setupCaptureBoxResize() {
     // Change cursor to move
     document.body.style.cursor = 'move';
 
-    // Set to free mode when manually dragging
-    captureBox.ratio = 'free';
+    // Dragging doesn't change the ratio mode - aspect ratio is preserved
   });
 
   document.addEventListener('mousemove', (e) => {
@@ -757,6 +759,42 @@ function setupCaptureBoxResize() {
           break;
       }
 
+      // Apply aspect ratio locking based on current mode
+      if (captureBox.ratio === 'square') {
+        // Lock to 1:1 aspect ratio - use the larger dimension
+        const size = Math.max(newWidth, newHeight);
+        newWidth = size;
+        newHeight = size;
+
+        // Adjust position for handles that move the top/left edge
+        if (currentHandle === 'nw' || currentHandle === 'ne') {
+          newTop = startTop + startHeight - newHeight;
+        }
+        if (currentHandle === 'nw' || currentHandle === 'sw') {
+          newLeft = startLeft + startWidth - newWidth;
+        }
+      } else if (captureBox.ratio === 'vertical') {
+        // Lock to 9:16 aspect ratio (portrait)
+        const VERTICAL_RATIO = 9 / 16;
+        // Use width as the constraint
+        newHeight = newWidth / VERTICAL_RATIO;
+
+        // Adjust top position for handles that move the top edge
+        if (currentHandle === 'nw' || currentHandle === 'ne') {
+          newTop = startTop + startHeight - newHeight;
+        }
+      } else if (captureBox.ratio === 'horizontal') {
+        // Lock to 16:9 aspect ratio (landscape)
+        const HORIZONTAL_RATIO = 16 / 9;
+        // Use width as the constraint
+        newHeight = newWidth / HORIZONTAL_RATIO;
+
+        // Adjust top position for handles that move the top edge
+        if (currentHandle === 'nw' || currentHandle === 'ne') {
+          newTop = startTop + startHeight - newHeight;
+        }
+      }
+
       // Constrain to map bounds
       const mapWidth = mapContainer.clientWidth;
       const mapHeight = mapContainer.clientHeight;
@@ -765,6 +803,29 @@ function setupCaptureBoxResize() {
       newHeight = Math.max(100, Math.min(newHeight, mapHeight - newTop));
       newLeft = Math.max(0, Math.min(newLeft, mapWidth - 100));
       newTop = Math.max(0, Math.min(newTop, mapHeight - 100));
+
+      // Re-apply aspect ratio after boundary constraints
+      if (captureBox.ratio === 'square') {
+        const size = Math.min(newWidth, newHeight);
+        newWidth = size;
+        newHeight = size;
+      } else if (captureBox.ratio === 'vertical') {
+        const VERTICAL_RATIO = 9 / 16;
+        newHeight = newWidth / VERTICAL_RATIO;
+        // Check if height exceeds bounds and adjust
+        if (newTop + newHeight > mapHeight) {
+          newHeight = mapHeight - newTop;
+          newWidth = newHeight * VERTICAL_RATIO;
+        }
+      } else if (captureBox.ratio === 'horizontal') {
+        const HORIZONTAL_RATIO = 16 / 9;
+        newHeight = newWidth / HORIZONTAL_RATIO;
+        // Check if height exceeds bounds and adjust
+        if (newTop + newHeight > mapHeight) {
+          newHeight = mapHeight - newTop;
+          newWidth = newHeight * HORIZONTAL_RATIO;
+        }
+      }
     }
 
     // Apply new dimensions
