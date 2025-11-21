@@ -206,6 +206,12 @@ function loadCachedActivities() {
 function handleActivitiesLoaded(loadedActivities) {
   activities = loadedActivities;
 
+  // Remove onboarding container if it exists (it overlays everything)
+  const onboardingContainer = document.getElementById('onboarding');
+  if (onboardingContainer) {
+    onboardingContainer.remove();
+  }
+
   // Update stats
   updateStats();
 
