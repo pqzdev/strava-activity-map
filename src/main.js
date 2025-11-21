@@ -20,6 +20,13 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 20
 }).addTo(map);
 
+// Update stats when map bounds change (pan/zoom)
+map.on('moveend', () => {
+  if (activities.length > 0) {
+    updateStats();
+  }
+});
+
 // State
 let activities = [];
 let polylines = [];
@@ -224,19 +231,43 @@ function handleActivitiesLoaded(loadedActivities) {
 }
 
 function updateStats() {
-  const stats = activities.reduce((acc, activity) => {
+  // Get filtered activities based on type selection
+  const selectedTypes = getSelectedActivityTypes();
+  let filteredActivities = selectedTypes === 'all'
+    ? activities
+    : activities.filter(a => selectedTypes.includes(a.type));
+
+  // Filter by map bounds - only include activities with at least one point visible
+  const mapBounds = map ? map.getBounds() : null;
+  if (mapBounds) {
+    filteredActivities = filteredActivities.filter(activity => {
+      const polylineStr = activity.map?.summary_polyline;
+      if (!polylineStr) return false;
+
+      const coords = decodePolyline(polylineStr);
+      // Check if any point is within the current map bounds
+      return coords.some(([lat, lng]) => mapBounds.contains([lat, lng]));
+    });
+  }
+
+  // Calculate stats from filtered activities
+  const stats = filteredActivities.reduce((acc, activity) => {
     acc.types.add(activity.type);
     acc.totalDistance += activity.distance || 0;
     return acc;
   }, { types: new Set(), totalDistance: 0 });
 
-  statCount.textContent = activities.length;
+  statCount.textContent = filteredActivities.length;
   statDistance.textContent = (stats.totalDistance / 1000).toFixed(2);
   statTypes.textContent = stats.types.size;
 }
 
 function populateActivityTypes() {
-  const types = [...new Set(activities.map(a => a.type))].sort();
+  // Only include types that have at least one activity with a polyline
+  const typesWithPolylines = activities
+    .filter(a => a.map?.summary_polyline)
+    .map(a => a.type);
+  const types = [...new Set(typesWithPolylines)].sort();
 
   // Clear existing pills
   activityTypeList.innerHTML = '';
@@ -437,6 +468,9 @@ function handleActivityTypeChange() {
 
   // Update color schemes to show only selected types
   populateColorSchemes();
+
+  // Update stats to reflect new filter
+  updateStats();
 
   // Re-render activities with new filter
   if (animationController) {
