@@ -206,6 +206,12 @@ function loadCachedActivities() {
 function handleActivitiesLoaded(loadedActivities) {
   activities = loadedActivities;
 
+  // Remove onboarding container if it exists (it overlays everything)
+  const onboardingContainer = document.getElementById('onboarding');
+  if (onboardingContainer) {
+    onboardingContainer.remove();
+  }
+
   // Update stats
   updateStats();
 
@@ -709,12 +715,10 @@ function setupCaptureBoxResize() {
 
         // Update UI to reflect the mode change
         document.querySelectorAll('.aspect-ratio-pill').forEach(pill => {
-          const pillRatio = pill.querySelector('input').value;
+          const pillRatio = pill.getAttribute('data-ratio');
           if (pillRatio === 'free') {
-            pill.querySelector('input').checked = true;
             pill.classList.add('selected');
           } else {
-            pill.querySelector('input').checked = false;
             pill.classList.remove('selected');
           }
         });
@@ -1518,12 +1522,10 @@ function restoreStateFromURL() {
       captureBox.ratio = ratio;
       // Update the UI to reflect the ratio
       document.querySelectorAll('.aspect-ratio-pill').forEach(pill => {
-        const pillRatio = pill.querySelector('input').value;
+        const pillRatio = pill.getAttribute('data-ratio');
         if (pillRatio === ratio) {
-          pill.querySelector('input').checked = true;
           pill.classList.add('selected');
         } else {
-          pill.querySelector('input').checked = false;
           pill.classList.remove('selected');
         }
       });
