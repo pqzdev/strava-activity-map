@@ -672,6 +672,7 @@ function initializeCaptureBox() {
   updateCaptureBox('max');
   captureBoxEl.classList.add('active');
   captureOverlay.classList.add('active');
+  captureOverlay.style.display = 'block'; // Override inline display: none
   setupCaptureBoxResize();
 }
 
