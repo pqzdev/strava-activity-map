@@ -368,7 +368,7 @@ export class AnimationController {
   _renderActivitiesUpToTime(time) {
     this.sortedActivities.forEach(activity => {
       const activityDate = new Date(activity.start_date);
-      if (activityDate <= time) {
+      if (activityDate <= time && !this.activePolylines.has(activity.id)) {
         const polylineStr = activity.map?.summary_polyline;
         if (!polylineStr) return;
 
@@ -422,6 +422,13 @@ export class AnimationController {
    * Clear all polylines from map
    */
   _clearAllPolylines() {
+    // Cancel any pending animation frame to prevent it from adding polylines
+    // after we clear, which would cause duplicates
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+
     this.activePolylines.forEach(data => {
       data.polyline.remove();
     });

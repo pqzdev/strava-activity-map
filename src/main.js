@@ -202,6 +202,12 @@ const statCount = document.getElementById('stat-count');
 const statDistance = document.getElementById('stat-distance');
 const statTypes = document.getElementById('stat-types');
 
+// Date filter controls
+const dateFilterGroup = document.getElementById('date-filter-group');
+const filterStartDate = document.getElementById('filter-start-date');
+const filterEndDate = document.getElementById('filter-end-date');
+const dateFilterResetBtn = document.getElementById('date-filter-reset-btn');
+
 // Animation controls
 const animationControlsEl = document.getElementById('animation-controls');
 const playBtn = document.getElementById('play-btn');
@@ -336,6 +342,9 @@ function handleActivitiesLoaded(loadedActivities) {
 
   // Populate activity type filter
   populateActivityTypes();
+
+  // Initialize date filter with full range
+  initializeDateFilter();
 
   // Populate color schemes
   populateColorSchemes();
@@ -482,6 +491,31 @@ function updateStats() {
   updateDatePreview();
 }
 
+function initializeDateFilter() {
+  const dates = activities
+    .filter(a => a.start_date)
+    .map(a => new Date(a.start_date));
+
+  if (dates.length === 0) return;
+
+  const minDate = new Date(Math.min(...dates));
+  const maxDate = new Date(Math.max(...dates));
+
+  const minStr = formatDateForInput(minDate);
+  const maxStr = formatDateForInput(maxDate);
+
+  filterStartDate.min = minStr;
+  filterStartDate.max = maxStr;
+  filterEndDate.min = minStr;
+  filterEndDate.max = maxStr;
+
+  // Default to full range
+  filterStartDate.value = minStr;
+  filterEndDate.value = maxStr;
+
+  dateFilterGroup.style.display = '';
+}
+
 function populateActivityTypes() {
   // Only include types that have at least one activity with a polyline
   const typesWithPolylines = activities
@@ -489,11 +523,11 @@ function populateActivityTypes() {
     .map(a => a.type);
   const types = [...new Set(typesWithPolylines)].sort();
 
-  // Clear existing pills
-  activityTypeList.innerHTML = '';
-
   // Get the parent pills container
   const pillsContainer = activityTypeList.parentElement;
+
+  // Clear all previously generated type pills (keep the "All" pill)
+  pillsContainer.querySelectorAll('.activity-pill:not(.all-pill)').forEach(el => el.remove());
 
   // Create pill for each activity type
   types.forEach(type => {
@@ -616,11 +650,36 @@ function getSelectedActivityTypes() {
 function getFilteredActivities() {
   // Filter by activity type
   const selectedTypes = getSelectedActivityTypes();
-  const filtered = selectedTypes === 'all'
+  let filtered = selectedTypes === 'all'
     ? activities
     : activities.filter(a => selectedTypes.includes(a.type));
 
+  // Filter by date range
+  const filterStart = filterStartDate ? filterStartDate.value : '';
+  const filterEnd = filterEndDate ? filterEndDate.value : '';
+  if (filterStart) {
+    const start = new Date(filterStart);
+    filtered = filtered.filter(a => new Date(a.start_date) >= start);
+  }
+  if (filterEnd) {
+    const end = new Date(filterEnd);
+    // Include the full end day
+    end.setHours(23, 59, 59, 999);
+    filtered = filtered.filter(a => new Date(a.start_date) <= end);
+  }
+
   return filtered;
+}
+
+// Handle date filter changes
+function handleDateFilterChange() {
+  updateStats();
+
+  if (animationController) {
+    initializeAnimation();
+  } else {
+    renderActivities();
+  }
 }
 
 // Handle activity type checkbox changes
@@ -1509,6 +1568,15 @@ exportFps.addEventListener('change', () => {
 });
 exportStartDate.addEventListener('change', scheduleURLUpdate);
 exportEndDate.addEventListener('change', scheduleURLUpdate);
+
+// Date filter controls
+filterStartDate.addEventListener('change', handleDateFilterChange);
+filterEndDate.addEventListener('change', handleDateFilterChange);
+dateFilterResetBtn.addEventListener('click', () => {
+  // Reset to full range (re-initialize)
+  initializeDateFilter();
+  handleDateFilterChange();
+});
 
 // Date overlay controls
 includeDateOverlay.addEventListener('change', () => {

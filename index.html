@@ -672,8 +672,18 @@
       </div>
     </div>
 
+    <div class="control-group" id="date-filter-group" style="display: none;">
+      <label>Date Range</label>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input type="date" id="filter-start-date" style="flex: 1; font-size: 13px; padding: 6px;">
+        <span style="color: #999; flex-shrink: 0;">–</span>
+        <input type="date" id="filter-end-date" style="flex: 1; font-size: 13px; padding: 6px;">
+      </div>
+      <button id="date-filter-reset-btn" class="secondary" style="margin-top: 6px; padding: 5px 10px; font-size: 12px; width: auto;">Reset</button>
+    </div>
+
     <details class="collapsible-section">
-      <summary style="cursor: pointer; font-weight: 600; margin-bottom: 10px; user-select: none;">Color Schemes</summary>
+      <summary style="cursor: pointer; font-weight: 600; margin-bottom: 10px; user-select: none;">Colour scheme</summary>
       <div id="color-schemes-list" style="margin-left: 10px;">
         <!-- Populated dynamically -->
       </div>
