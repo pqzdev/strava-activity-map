@@ -844,8 +844,9 @@ function initializeAnimation() {
   // Show animation controls
   animationControlsEl.style.display = 'block';
 
-  // Update initial time display
+  // Update initial time display and slider position
   updateTimeDisplay(animationController.currentTime);
+  updateTimelineSlider();
 
   // Initialize GIF exporter
   gifExporter = new GifExporter(animationController, map);
