@@ -176,23 +176,16 @@ export class OnboardingUI {
             <h2>Step 4: Load Activities</h2>
             <p id="athlete-welcome"></p>
 
-            <div class="cache-info" id="cache-info" style="display: none;">
-              <p><i class="fas fa-check-circle" style="color: #4caf50;"></i> <strong id="cached-count">0</strong> activities cached <small>(<span id="cache-age">0</span>m ago)</small></p>
-              <button class="btn-secondary" onclick="onboarding.clearCache()">Clear & Re-fetch</button>
+            <div id="fetch-options">
+              <!-- Populated dynamically in initializeStep5 -->
             </div>
 
-            <div class="fetch-controls" id="fetch-controls">
-              <div class="progress-container" id="fetch-progress" style="display: none;">
-                <div class="spinner"></div>
-                <p>Fetching: <strong id="fetch-count">0</strong> activities</p>
-              </div>
-
-              <div id="fetch-error" class="error-message" style="display: none;"></div>
-
-              <button class="btn-primary" id="fetch-btn" onclick="onboarding.fetchActivities()">
-                Fetch Activities
-              </button>
+            <div class="progress-container" id="fetch-progress" style="display: none;">
+              <div class="spinner"></div>
+              <p>Fetching: <strong id="fetch-count">0</strong> activities</p>
             </div>
+
+            <div id="fetch-error" class="error-message" style="display: none;"></div>
 
             <div class="button-row" style="margin-top: 20px;">
               <button class="btn-secondary" onclick="onboarding.startOver()">Start Over</button>
@@ -450,10 +443,19 @@ export class OnboardingUI {
   }
 
   /**
+   * Format a date as DD MMM YYYY
+   */
+  _formatDate(date) {
+    if (!date) return '?';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  }
+
+  /**
    * Initialize step 5 (fetch activities)
    */
   initializeStep5() {
-    // Show athlete info and what will be loaded
+    // Show athlete info
     const athlete = this.auth.getAthlete();
     const scope = sessionStorage.getItem(this.auth.storageKeys.scope);
     const hasPrivateAccess = scope === 'read_all';
@@ -467,56 +469,45 @@ export class OnboardingUI {
         `Welcome, ${athlete.firstname} ${athlete.lastname}! <i class="fas fa-hand-wave" style="color: #fc4c02;"></i><br><small style="color: #666;">${loadingMessage}</small>`;
     }
 
-    // Check for cached activities
+    const optionsEl = document.getElementById('fetch-options');
     const cacheInfo = this.api.getCacheInfo();
+
     if (cacheInfo) {
-      document.getElementById('cache-info').style.display = 'block';
-      document.getElementById('cached-count').textContent = cacheInfo.count;
-      document.getElementById('cache-age').textContent = cacheInfo.ageMinutes;
+      const fromStr = this._formatDate(cacheInfo.minDate);
+      const toStr = this._formatDate(cacheInfo.maxDate);
+      const newFromStr = this._formatDate(cacheInfo.maxDate); // fetch starts from last day
 
-      // Hide fetch controls, show use cached button
-      const fetchControls = document.getElementById('fetch-controls');
-      fetchControls.innerHTML = `
-        <p><i class="fas fa-check-circle" style="color: #4caf50;"></i> You have cached activities ready to use!</p>
-        <button class="btn-primary" onclick="onboarding.useCachedActivities()">
-          Use Cached Activities (${cacheInfo.count})
-        </button>
-        <p style="margin-top: 10px;"><small>or</small></p>
-      ` + fetchControls.innerHTML;
-    }
-  }
+      optionsEl.innerHTML = `
+        <div class="fetch-option">
+          <button class="btn-primary" onclick="onboarding.useCachedActivities()">
+            Use cached activities
+          </button>
+          <small>${fromStr} – ${toStr} &nbsp;·&nbsp; ${cacheInfo.count} activities</small>
+        </div>
 
-  /**
-   * Fetch activities from Strava
-   */
-  async fetchActivities() {
-    const fetchBtn = document.getElementById('fetch-btn');
-    const progressEl = document.getElementById('fetch-progress');
-    const countEl = document.getElementById('fetch-count');
-    const errorEl = document.getElementById('fetch-error');
+        <div class="fetch-option">
+          <button class="btn-primary" onclick="onboarding.fetchNewActivities()">
+            Fetch new activities
+          </button>
+          <small>From ${newFromStr}</small>
+        </div>
 
-    try {
-      fetchBtn.disabled = true;
-      progressEl.style.display = 'block';
-      errorEl.style.display = 'none';
-
-      // Fetch activities
-      const activities = await this.api.fetchAllActivities((count) => {
-        countEl.textContent = count;
-      });
-
-      // Cache activities
-      this.api.cacheActivities(activities);
-
-      // Complete onboarding
-      this.complete(activities);
-
-    } catch (error) {
-      console.error('Failed to fetch activities:', error);
-      errorEl.textContent = `Error: ${error.message}`;
-      errorEl.style.display = 'block';
-      fetchBtn.disabled = false;
-      progressEl.style.display = 'none';
+        <div class="fetch-option">
+          <button class="btn-secondary" onclick="onboarding.fetchAllActivities()">
+            Fetch all activities
+          </button>
+          <small>Deletes cache and re-fetches everything</small>
+        </div>
+      `;
+    } else {
+      optionsEl.innerHTML = `
+        <div class="fetch-option">
+          <button class="btn-primary" onclick="onboarding.fetchAllActivities()">
+            Fetch Activities
+          </button>
+          <small>Download all your activities from Strava</small>
+        </div>
+      `;
     }
   }
 
@@ -531,13 +522,61 @@ export class OnboardingUI {
   }
 
   /**
-   * Clear cache
+   * Fetch only new activities (since last cached date) and merge with cache
    */
-  clearCache() {
-    if (confirm('This will delete your cached activities. Continue?')) {
-      this.api.clearCache();
-      // Reload step 5
-      this.showStep(5);
+  async fetchNewActivities() {
+    const cacheInfo = this.api.getCacheInfo();
+    if (!cacheInfo || !cacheInfo.maxDate) return;
+
+    // Start from beginning of the last cached day to catch same-day uploads
+    const afterDate = new Date(cacheInfo.maxDate);
+    afterDate.setHours(0, 0, 0, 0);
+    const afterEpoch = Math.floor(afterDate.getTime() / 1000);
+
+    await this._doFetch(async (onProgress) => {
+      const newActivities = await this.api.fetchActivitiesAfter(afterEpoch, onProgress);
+      return this.api.mergeAndCacheActivities(newActivities);
+    });
+  }
+
+  /**
+   * Fetch all activities (clears cache first)
+   */
+  async fetchAllActivities() {
+    this.api.clearCache();
+    await this._doFetch(async (onProgress) => {
+      const activities = await this.api.fetchAllActivities(onProgress);
+      this.api.cacheActivities(activities);
+      return activities;
+    });
+  }
+
+  /**
+   * Shared fetch UI logic
+   */
+  async _doFetch(fetchFn) {
+    const progressEl = document.getElementById('fetch-progress');
+    const countEl = document.getElementById('fetch-count');
+    const errorEl = document.getElementById('fetch-error');
+    const optionsEl = document.getElementById('fetch-options');
+
+    try {
+      optionsEl.style.display = 'none';
+      progressEl.style.display = 'block';
+      errorEl.style.display = 'none';
+
+      const activities = await fetchFn((count) => {
+        countEl.textContent = count;
+      });
+
+      this.complete(activities);
+
+    } catch (error) {
+      console.error('Failed to fetch activities:', error);
+      errorEl.textContent = `Error: ${error.message}`;
+      errorEl.style.display = 'block';
+      progressEl.style.display = 'none';
+      optionsEl.style.display = 'block';
     }
   }
 
@@ -831,6 +870,22 @@ export class OnboardingUI {
 
       .progress-container p {
         margin-top: 10px;
+      }
+
+      .fetch-option {
+        margin: 12px 0;
+      }
+
+      .fetch-option button {
+        width: 100%;
+        margin-bottom: 4px;
+      }
+
+      .fetch-option small {
+        display: block;
+        text-align: center;
+        color: #888;
+        font-size: 12px;
       }
     `;
   }

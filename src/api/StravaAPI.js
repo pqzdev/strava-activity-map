@@ -14,6 +14,20 @@ export class StravaAPI {
    * Fetch all activities from Strava API
    */
   async fetchAllActivities(onProgress = null) {
+    return this._fetchActivities({ onProgress });
+  }
+
+  /**
+   * Fetch activities after a given date (epoch seconds)
+   */
+  async fetchActivitiesAfter(afterEpochSeconds, onProgress = null) {
+    return this._fetchActivities({ afterEpochSeconds, onProgress });
+  }
+
+  /**
+   * Internal paginated fetch
+   */
+  async _fetchActivities({ afterEpochSeconds = null, onProgress = null } = {}) {
     const activities = [];
     let page = 1;
     const perPage = 200; // Max allowed by Strava
@@ -21,7 +35,11 @@ export class StravaAPI {
     while (true) {
       const token = await this.auth.getAccessToken();
 
-      const url = `${this.baseUrl}/athlete/activities?per_page=${perPage}&page=${page}`;
+      let url = `${this.baseUrl}/athlete/activities?per_page=${perPage}&page=${page}`;
+      if (afterEpochSeconds) {
+        url += `&after=${afterEpochSeconds}`;
+      }
+
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -121,14 +139,37 @@ export class StravaAPI {
       if (!data) return null;
 
       const parsed = JSON.parse(data);
+      const activities = parsed.activities || [];
+
+      let minDate = null;
+      let maxDate = null;
+      activities.forEach(a => {
+        const d = new Date(a.start_date);
+        if (!minDate || d < minDate) minDate = d;
+        if (!maxDate || d > maxDate) maxDate = d;
+      });
+
       return {
         count: parsed.count,
         cachedAt: new Date(parsed.cachedAt),
-        ageMinutes: Math.round((Date.now() - parsed.cachedAt) / 1000 / 60)
+        ageMinutes: Math.round((Date.now() - parsed.cachedAt) / 1000 / 60),
+        minDate,
+        maxDate
       };
     } catch (e) {
       return null;
     }
+  }
+
+  /**
+   * Merge new activities into cache, deduplicating by id, keeping sorted by date desc
+   */
+  mergeAndCacheActivities(newActivities) {
+    const existing = this.getCachedActivities() || [];
+    const existingIds = new Set(existing.map(a => a.id));
+    const merged = [...existing, ...newActivities.filter(a => !existingIds.has(a.id))];
+    this.cacheActivities(merged);
+    return merged;
   }
 
   /**
