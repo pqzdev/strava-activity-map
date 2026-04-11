@@ -43,15 +43,12 @@ export class GifExporter {
       const activityDates = this._getActivityDatesInRange(startDate, endDate);
       console.log(`Found ${activityDates.length} days with activities`);
 
-      // Calculate frame count based on activity days, not total time
-      // Distribute frames across days with activities
-      const frameCount = Math.floor((duration - 1) * fps);
-      const frames = [];
-
-      // If no activities, fall back to standard behavior
-      if (activityDates.length === 0) {
-        console.log('No activities found in range, using uniform time distribution');
-      }
+      // Sample activity dates down to at most (duration-1)*fps frames.
+      // Each sampled date becomes exactly one frame so no date ever gets
+      // duplicated (which would make it appear longer than others).
+      const maxFrames = Math.max(1, Math.floor((duration - 1) * fps));
+      const frameTimes = this._sampleDates(activityDates, maxFrames, startDate, endDate);
+      const frameCount = frameTimes.length;
 
       console.log(`Will capture ${frameCount} frames`);
 
@@ -62,9 +59,6 @@ export class GifExporter {
       const wasPlaying = this.animationController.isPlaying;
       const originalTime = this.animationController.currentTime;
       this.animationController.pause();
-
-      // Calculate frame times based on activity dates (skip empty periods)
-      const frameTimes = this._calculateFrameTimes(startDate, endDate, frameCount, activityDates);
 
       // Calculate the actual lat/lng bounds for the capture box area
       // If no capture box specified, use full map bounds
@@ -82,6 +76,10 @@ export class GifExporter {
       const baseMapCanvas = await this._captureBasemap(width, height, captureBox);
       console.log('Base map captured');
 
+      // Each frame gets equal delay so every date appears for the same duration
+      const frameDelayMs = Math.round((duration - 1) * 1000 / frameCount);
+      const frames = [];
+
       // Capture frames using calculated times (skips empty periods)
       for (let i = 0; i < frameTimes.length; i++) {
         const currentTime = frameTimes[i];
@@ -94,7 +92,7 @@ export class GifExporter {
 
         // Capture frame (polylines only, then composite with base map)
         const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, exportBounds, false, currentTime, dateOverlay);
-        frames.push(canvas);
+        frames.push({ canvas, delay: frameDelayMs });
 
         // Update progress (5-50% for frame capture)
         const progress = 5 + ((i + 1) / frameTimes.length) * 45;
@@ -115,7 +113,7 @@ export class GifExporter {
 
       // Create GIF — final frame held for 1 second
       this._updateProgress(50, 'Encoding GIF...');
-      const gifBlob = await this._encodeGif(frames, fps, quality, width, height, finalCanvas);
+      const gifBlob = await this._encodeGif(frames, quality, width, height, finalCanvas);
 
       // Complete
       this._updateProgress(100, 'Complete!');
@@ -288,23 +286,28 @@ export class GifExporter {
   }
 
   /**
-   * Convert lat/lng to pixel coordinates based on map bounds
+   * Convert lat/lng to pixel coordinates using Web Mercator projection,
+   * matching how Leaflet/CartoDB renders map tiles.
    */
   _latLngToPixel(lat, lng, bounds, width, height) {
+    const toMercatorY = (latDeg) => {
+      const latRad = latDeg * Math.PI / 180;
+      return Math.log(Math.tan(Math.PI / 4 + latRad / 2));
+    };
+
+    const west = bounds.getWest();
+    const east = bounds.getEast();
     const north = bounds.getNorth();
     const south = bounds.getSouth();
-    const east = bounds.getEast();
-    const west = bounds.getWest();
 
-    // Calculate relative position within bounds (0-1)
-    const x = (lng - west) / (east - west);
-    const y = (north - lat) / (north - south);
+    const mercNorth = toMercatorY(north);
+    const mercSouth = toMercatorY(south);
+    const mercLat = toMercatorY(lat);
 
-    // Convert to pixel coordinates
-    return {
-      x: x * width,
-      y: y * height
-    };
+    const x = (lng - west) / (east - west) * width;
+    const y = (mercNorth - mercLat) / (mercNorth - mercSouth) * height;
+
+    return { x, y };
   }
 
   /**
@@ -506,37 +509,39 @@ export class GifExporter {
   }
 
   /**
-   * Calculate frame times, skipping empty periods between activity days
+   * Sample activity dates down to at most maxFrames unique entries.
+   * Returns one date per frame with no duplicates, so every date gets
+   * exactly the same screen time in the GIF.
    */
-  _calculateFrameTimes(startDate, endDate, frameCount, activityDates) {
-    // If no activities, fall back to uniform distribution
+  _sampleDates(activityDates, maxFrames, startDate, endDate) {
     if (activityDates.length === 0) {
-      const totalTime = endDate - startDate;
-      const timeStep = totalTime / frameCount;
-      return Array.from({ length: frameCount }, (_, i) =>
-        new Date(startDate.getTime() + (timeStep * i))
+      // No activities — fall back to uniform distribution across the range
+      const totalMs = endDate - startDate;
+      const count = Math.max(1, maxFrames);
+      return Array.from({ length: count }, (_, i) =>
+        new Date(startDate.getTime() + (totalMs * i / (count - 1 || 1)))
       );
     }
 
-    // Map frames to activity dates, sampling evenly across all days.
-    // Use (N-1) as the denominator so frame 0 → first day and
-    // frame (frameCount-1) → last day, with no saturation at the end.
-    const n = activityDates.length;
-    const frameTimes = [];
-
-    for (let i = 0; i < frameCount; i++) {
-      const progress = i / (frameCount - 1 || 1); // 0 → 1 inclusive
-      const dateIndex = Math.round(progress * (n - 1));
-      frameTimes.push(activityDates[dateIndex]);
+    if (activityDates.length <= maxFrames) {
+      // Fewer (or equal) unique dates than frames — use every date once
+      return activityDates;
     }
 
-    return frameTimes;
+    // More dates than frames — sample evenly, first → last, no duplicates
+    const sampled = [];
+    for (let i = 0; i < maxFrames; i++) {
+      const progress = i / (maxFrames - 1);
+      const idx = Math.round(progress * (activityDates.length - 1));
+      sampled.push(activityDates[idx]);
+    }
+    return sampled;
   }
 
   /**
    * Encode frames as GIF
    */
-  _encodeGif(canvases, fps, quality, width, height, finalCanvas = null) {
+  _encodeGif(frames, quality, width, height, finalCanvas = null) {
     return new Promise((resolve, reject) => {
       try {
         const gif = new GIF({
@@ -549,11 +554,10 @@ export class GifExporter {
 
         console.log('GIF encoder created, adding frames...');
 
-        // Add frames to GIF
-        const frameDelay = 1000 / fps; // ms between frames
-        canvases.forEach((canvas, index) => {
-          console.log(`Adding frame ${index + 1}/${canvases.length}`);
-          gif.addFrame(canvas, { delay: frameDelay, copy: true });
+        // Add frames — each carries its own delay
+        frames.forEach(({ canvas, delay }, index) => {
+          console.log(`Adding frame ${index + 1}/${frames.length} (delay ${delay}ms)`);
+          gif.addFrame(canvas, { delay, copy: true });
         });
 
         // Add final frame held for 1 second
