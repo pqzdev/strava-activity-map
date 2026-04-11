@@ -461,19 +461,20 @@ export class GifExporter {
     activities.forEach(activity => {
       const activityDate = new Date(activity.start_date);
       if (activityDate >= startDate && activityDate <= endOfDay) {
-        // Store date as YYYY-MM-DD string to get unique days
-        const dateKey = activityDate.toISOString().split('T')[0];
-        dateSet.add(dateKey);
+        // Use local date parts so activities in non-UTC timezones land on the right day
+        const y = activityDate.getFullYear();
+        const m = String(activityDate.getMonth() + 1).padStart(2, '0');
+        const d = String(activityDate.getDate()).padStart(2, '0');
+        dateSet.add(`${y}-${m}-${d}`);
       }
     });
 
-    // Convert back to sorted Date objects (end of each day)
+    // Convert back to sorted Date objects (local end-of-day)
     const dates = Array.from(dateSet)
       .sort()
       .map(dateStr => {
-        const d = new Date(dateStr);
-        d.setHours(23, 59, 59, 999);
-        return d;
+        const [y, m, d] = dateStr.split('-');
+        return new Date(+y, +m - 1, +d, 23, 59, 59, 999); // local end-of-day
       });
 
     return dates;
