@@ -663,13 +663,13 @@ function getFilteredActivities() {
   const filterStart = filterStartDate ? filterStartDate.value : '';
   const filterEnd = filterEndDate ? filterEndDate.value : '';
   if (filterStart) {
-    const start = new Date(filterStart);
+    const [y, m, d] = filterStart.split('-');
+    const start = new Date(+y, +m - 1, +d); // local midnight
     filtered = filtered.filter(a => new Date(a.start_date) >= start);
   }
   if (filterEnd) {
-    const end = new Date(filterEnd);
-    // Include the full end day
-    end.setHours(23, 59, 59, 999);
+    const [y, m, d] = filterEnd.split('-');
+    const end = new Date(+y, +m - 1, +d, 23, 59, 59, 999); // local end-of-day
     filtered = filtered.filter(a => new Date(a.start_date) <= end);
   }
 
@@ -1625,8 +1625,10 @@ exportBtn.addEventListener('click', async () => {
 
   try {
     // Get export parameters
-    const startDate = new Date(exportStartDate.value);
-    const endDate = new Date(exportEndDate.value);
+    // Parse date inputs as local midnight (not UTC midnight)
+    const parseLocalDate = (str) => { const [y, m, d] = str.split('-'); return new Date(+y, +m - 1, +d); };
+    const startDate = parseLocalDate(exportStartDate.value);
+    const endDate = parseLocalDate(exportEndDate.value);
     const duration = parseInt(exportDuration.value);
     const width = parseInt(exportWidth.value);
     const height = parseInt(exportHeight.value);
