@@ -343,14 +343,8 @@ function handleActivitiesLoaded(loadedActivities) {
   // Populate activity type filter
   populateActivityTypes();
 
-  // Initialize date filter with full range, then apply any URL-restored values
+  // Initialize date filter with full range (URL restore applied below after restoreStateFromURL)
   initializeDateFilter();
-  if (window.pendingDateFilterRestore) {
-    const { start, end } = window.pendingDateFilterRestore;
-    if (start) filterStartDate.value = start;
-    if (end) filterEndDate.value = end;
-    delete window.pendingDateFilterRestore;
-  }
 
   // Populate color schemes
   populateColorSchemes();
@@ -372,6 +366,15 @@ function handleActivitiesLoaded(loadedActivities) {
 
   // Restore state from URL (after everything is initialized)
   restoreStateFromURL();
+
+  // Apply pending date filter (if restored from URL)
+  if (window.pendingDateFilterRestore) {
+    const { start, end } = window.pendingDateFilterRestore;
+    if (start) filterStartDate.value = start;
+    if (end) filterEndDate.value = end;
+    delete window.pendingDateFilterRestore;
+    initializeAnimation();
+  }
 
   // Apply pending activity type filters (if restored from URL)
   if (window.pendingActivityTypesRestore) {
