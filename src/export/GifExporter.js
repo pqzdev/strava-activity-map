@@ -92,7 +92,8 @@ export class GifExporter {
 
         // Capture frame (polylines only, then composite with base map)
         const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, exportBounds, false, currentTime, dateOverlay);
-        frames.push({ canvas, delay: frameDelayMs });
+        const isLast = i === frameTimes.length - 1;
+        frames.push({ canvas, delay: isLast ? 1000 : frameDelayMs });
 
         // Update progress (5-50% for frame capture)
         const progress = 5 + ((i + 1) / frameTimes.length) * 45;
