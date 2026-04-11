@@ -454,9 +454,13 @@ export class GifExporter {
     const activities = this.animationController.activities;
     const dateSet = new Set();
 
+    // Extend endDate to end-of-day so activities at any time on the last day are included
+    const endOfDay = new Date(endDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
     activities.forEach(activity => {
       const activityDate = new Date(activity.start_date);
-      if (activityDate >= startDate && activityDate <= endDate) {
+      if (activityDate >= startDate && activityDate <= endOfDay) {
         // Store date as YYYY-MM-DD string to get unique days
         const dateKey = activityDate.toISOString().split('T')[0];
         dateSet.add(dateKey);
