@@ -55,10 +55,11 @@ export class GifExporter {
       // Update progress
       this._updateProgress(0, `Capturing ${frameCount} frames...`);
 
-      // Save current animation state
+      // Pause animation during export (frames drawn directly, no seeking)
       const wasPlaying = this.animationController.isPlaying;
       const originalTime = this.animationController.currentTime;
       this.animationController.pause();
+
 
       // Calculate the actual lat/lng bounds for the capture box area
       // If no capture box specified, use full map bounds
@@ -80,19 +81,12 @@ export class GifExporter {
       const frameDelayMs = Math.round((duration - 1) * 1000 / frameCount);
       const frames = [];
 
-      // Capture frames using calculated times (skips empty periods)
+      // Capture frames — draw directly from activities array, no Leaflet seek needed
       for (let i = 0; i < frameTimes.length; i++) {
         const currentTime = frameTimes[i];
-
-        // Seek animation to this time (in background)
-        this.animationController.seek(currentTime);
-
-        // Small delay for state to update
-        await this._waitForMapRender();
-
-        // Capture frame (polylines only, then composite with base map)
-        const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, exportBounds, false, currentTime, dateOverlay);
         const isLast = i === frameTimes.length - 1;
+
+        const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, exportBounds, currentTime, dateOverlay);
         frames.push({ canvas, delay: isLast ? 1000 : frameDelayMs });
 
         // Update progress (5-50% for frame capture)
@@ -204,79 +198,58 @@ export class GifExporter {
    * @param {Date} currentTime - Current animation time for date overlay
    * @param {Object} dateOverlay - Date overlay settings { enabled, corner, color }
    */
-  async _captureMapCanvas(width, height, baseMapCanvas, bounds, isLastFrame = false, currentTime = null, dateOverlay = { enabled: false }) {
-    console.log(`Capturing frame: ${this.animationController.activePolylines.size} active polylines${isLastFrame ? ' (final heatmap frame)' : ''}`);
-    console.log(`Export dimensions: ${width}x${height}`);
-    console.log(`Base map canvas: ${baseMapCanvas.width}x${baseMapCanvas.height}`);
-    console.log(`Bounds:`, bounds.toBBoxString());
-
-    // Create an offscreen canvas
+  async _captureMapCanvas(width, height, baseMapCanvas, bounds, currentTime, dateOverlay = { enabled: false }) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
 
-    // Draw base map first (scale it to export size)
+    // Draw base map
     if (baseMapCanvas) {
-      // Draw the captured base map, scaled to the export dimensions
       ctx.drawImage(baseMapCanvas, 0, 0, baseMapCanvas.width, baseMapCanvas.height, 0, 0, width, height);
     } else {
-      // Fallback to gray background
       ctx.fillStyle = '#f5f5f5';
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Draw all visible polylines on top
+    // Clip to canvas bounds so off-screen polyline segments don't bleed in from edges
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, height);
+    ctx.clip();
+
+    // Draw activities up to currentTime directly from the sorted activities array
+    const ac = this.animationController;
     let drawnCount = 0;
-    this.animationController.activePolylines.forEach((data) => {
-      const coords = data.coords;
+    ac.sortedActivities.forEach((activity) => {
+      if (new Date(activity.start_date) > currentTime) return;
+
+      const polylineStr = activity.map?.summary_polyline;
+      if (!polylineStr) return;
+      const coords = this._decodePolyline(polylineStr);
       if (coords.length < 2) return;
 
-      // Convert lat/lng to pixel coordinates using the export bounds
-      const points = coords.map(([lat, lng]) => {
-        const pixel = this._latLngToPixel(lat, lng, bounds, width, height);
-        return pixel;
-      });
+      const points = coords.map(([lat, lng]) => this._latLngToPixel(lat, lng, bounds, width, height));
 
-      // Debug first point
-      if (drawnCount === 0) {
-        console.log(`First activity first point: lat/lng=${coords[0]}, pixel=${points[0].x},${points[0].y}`);
-      }
+      const baseColor = this._getActivityColor(activity.type);
+      const activityDate = new Date(activity.start_date);
+      const style = ac._calculateStyle(activityDate, coords, currentTime);
+      const color = ac._darkenColor(baseColor, style.recencyScore * 0.3);
 
-      // Draw polyline
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) {
         ctx.lineTo(points[i].x, points[i].y);
       }
-
-      // Get the current style from the polyline (includes recency/overlap calculations)
-      const polylineOptions = data.polyline.options;
-      const baseColor = this._getActivityColor(data.activity.type);
-
-      if (isLastFrame) {
-        // Final frame: equal opacity for all routes to highlight overlapping paths
-        // Using low opacity so overlaps become more visible through additive blending
-        ctx.strokeStyle = baseColor;
-        ctx.lineWidth = 2.5;
-        ctx.globalAlpha = 0.3;
-      } else {
-        // Normal frame: use recency/overlap calculations
-        const activityDate = new Date(data.activity.start_date);
-        const style = this.animationController._calculateStyle(activityDate, coords, this.animationController.currentTime);
-        const color = this.animationController._darkenColor(baseColor, style.recencyScore * 0.3);
-
-        ctx.strokeStyle = color;
-        ctx.lineWidth = style.weight * 1.5; // Scale up slightly for export
-        ctx.globalAlpha = style.opacity;
-      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = style.weight * 1.5;
+      ctx.globalAlpha = style.opacity;
       ctx.stroke();
       drawnCount++;
     });
 
-    ctx.globalAlpha = 1;
-
-    console.log(`Drew ${drawnCount} polylines on canvas`);
+    ctx.restore();
+    console.log(`Drew ${drawnCount} polylines for time ${currentTime}`);
 
     // Render date overlay if enabled
     if (dateOverlay.enabled && currentTime) {
@@ -382,54 +355,45 @@ export class GifExporter {
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Count activities that intersect with capture bounds
+    // Count activities in bounds for opacity calculation
     let activitiesInBounds = 0;
     activities.forEach((activity) => {
       const polylineStr = activity.map?.summary_polyline;
       if (!polylineStr) return;
       const coords = this._decodePolyline(polylineStr);
-      // Check if any point is within bounds
-      const hasPointInBounds = coords.some(([lat, lng]) => bounds.contains([lat, lng]));
-      if (hasPointInBounds) activitiesInBounds++;
+      if (coords.some(([lat, lng]) => bounds.contains([lat, lng]))) activitiesInBounds++;
     });
 
-    // Calculate dynamic opacity based on activity density
     const dynamicOpacity = this._calculateHeatmapOpacity(activitiesInBounds);
-    console.log(`Dynamic opacity for ${activitiesInBounds} activities in bounds: ${dynamicOpacity}`);
 
-    // Draw ALL activities with dynamic opacity for better heatmap effect
+    // Clip to canvas so off-screen segments don't bleed in
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, height);
+    ctx.clip();
+
     let drawnCount = 0;
     activities.forEach((activity) => {
       const polylineStr = activity.map?.summary_polyline;
       if (!polylineStr) return;
-
-      // Decode polyline
       const coords = this._decodePolyline(polylineStr);
       if (coords.length < 2) return;
 
-      // Convert lat/lng to pixel coordinates
-      const points = coords.map(([lat, lng]) => {
-        const pixel = this._latLngToPixel(lat, lng, bounds, width, height);
-        return pixel;
-      });
+      const points = coords.map(([lat, lng]) => this._latLngToPixel(lat, lng, bounds, width, height));
 
-      // Draw polyline
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) {
         ctx.lineTo(points[i].x, points[i].y);
       }
-
-      // Use dynamic opacity based on activity density
-      const baseColor = this._getActivityColor(activity.type);
-      ctx.strokeStyle = baseColor;
+      ctx.strokeStyle = this._getActivityColor(activity.type);
       ctx.lineWidth = 2.5;
       ctx.globalAlpha = dynamicOpacity;
       ctx.stroke();
       drawnCount++;
     });
 
-    ctx.globalAlpha = 1;
+    ctx.restore();
     console.log(`Drew ${drawnCount} activities on heatmap frame`);
 
     // Render date overlay if enabled
