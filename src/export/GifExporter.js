@@ -83,6 +83,7 @@ export class GifExporter {
       // Capture frames using calculated times (skips empty periods)
       for (let i = 0; i < frameTimes.length; i++) {
         const currentTime = frameTimes[i];
+        const isLastFrame = i === frameTimes.length - 1;
 
         // Seek animation to this time (in background)
         this.animationController.seek(currentTime);
@@ -92,7 +93,8 @@ export class GifExporter {
 
         // Capture frame (polylines only, then composite with base map)
         const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, exportBounds, false, currentTime, dateOverlay);
-        frames.push({ canvas, delay: frameDelayMs });
+        // Last animation frame holds for 1 second to transition cleanly into the heatmap
+        frames.push({ canvas, delay: isLastFrame ? 1000 : frameDelayMs });
 
         // Update progress (5-50% for frame capture)
         const progress = 5 + ((i + 1) / frameTimes.length) * 45;
