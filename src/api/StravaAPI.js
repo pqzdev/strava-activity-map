@@ -1,13 +1,66 @@
 /**
  * Client-side Strava API wrapper
  * Fetches activities directly from browser
+ * Cache stored in IndexedDB (no size limit, unlike localStorage ~5MB)
  */
+
+const DB_NAME = 'strava_activity_map';
+const DB_VERSION = 1;
+const STORE_NAME = 'cache';
+const CACHE_KEY = 'activities';
+// Lightweight metadata in localStorage for fast existence checks without opening IndexedDB
+const META_KEY = 'strava_cache_meta';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      e.target.result.createObjectStore(STORE_NAME);
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function idbGet(db, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const req = tx.objectStore(STORE_NAME).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function idbPut(db, key, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const req = tx.objectStore(STORE_NAME).put(value, key);
+    req.onsuccess = () => resolve();
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function idbDelete(db, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const req = tx.objectStore(STORE_NAME).delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
 
 export class StravaAPI {
   constructor(auth) {
     this.auth = auth;
     this.baseUrl = 'https://www.strava.com/api/v3';
-    this.storageKey = 'strava_activities_cache';
+    this._db = null;
+  }
+
+  async _getDB() {
+    if (!this._db) {
+      this._db = await openDB();
+    }
+    return this._db;
   }
 
   /**
@@ -91,56 +144,57 @@ export class StravaAPI {
   }
 
   /**
-   * Cache activities in localStorage
+   * Cache activities in IndexedDB
    */
-  cacheActivities(activities) {
+  async cacheActivities(activities) {
     try {
-      const data = {
-        activities,
-        cachedAt: Date.now(),
-        count: activities.length
-      };
-      localStorage.setItem(this.storageKey, JSON.stringify(data));
+      const cachedAt = Date.now();
+      const db = await this._getDB();
+      await idbPut(db, CACHE_KEY, { activities, cachedAt, count: activities.length });
+
+      // Write lightweight metadata to localStorage for fast existence checks
+      localStorage.setItem(META_KEY, JSON.stringify({ count: activities.length, cachedAt }));
     } catch (e) {
       console.error('Failed to cache activities:', e);
     }
   }
 
   /**
-   * Get cached activities
+   * Get cached activities from IndexedDB
    */
-  getCachedActivities() {
+  async getCachedActivities() {
     try {
-      const data = localStorage.getItem(this.storageKey);
-      if (!data) return null;
-
-      const parsed = JSON.parse(data);
-      return parsed.activities;
+      const db = await this._getDB();
+      const data = await idbGet(db, CACHE_KEY);
+      return data ? data.activities : null;
     } catch (e) {
-      console.error('Failed to parse cached activities:', e);
+      console.error('Failed to read cached activities:', e);
       return null;
     }
   }
 
   /**
-   * Check if cache exists and is recent
+   * Check if cache exists (fast, uses localStorage metadata)
    */
   hasCachedActivities() {
-    const data = localStorage.getItem(this.storageKey);
-    return !!data;
+    return !!localStorage.getItem(META_KEY);
   }
 
   /**
-   * Get cache info
+   * Get cache info (count + date range) — reads metadata fast, then full data for dates
    */
-  getCacheInfo() {
+  async getCacheInfo() {
     try {
-      const data = localStorage.getItem(this.storageKey);
+      const meta = localStorage.getItem(META_KEY);
+      if (!meta) return null;
+
+      const { count, cachedAt } = JSON.parse(meta);
+
+      const db = await this._getDB();
+      const data = await idbGet(db, CACHE_KEY);
       if (!data) return null;
 
-      const parsed = JSON.parse(data);
-      const activities = parsed.activities || [];
-
+      const activities = data.activities || [];
       let minDate = null;
       let maxDate = null;
       activities.forEach(a => {
@@ -150,9 +204,9 @@ export class StravaAPI {
       });
 
       return {
-        count: parsed.count,
-        cachedAt: new Date(parsed.cachedAt),
-        ageMinutes: Math.round((Date.now() - parsed.cachedAt) / 1000 / 60),
+        count,
+        cachedAt: new Date(cachedAt),
+        ageMinutes: Math.round((Date.now() - cachedAt) / 1000 / 60),
         minDate,
         maxDate
       };
@@ -162,21 +216,27 @@ export class StravaAPI {
   }
 
   /**
-   * Merge new activities into cache, deduplicating by id, keeping sorted by date desc
+   * Merge new activities into cache, deduplicating by id
    */
-  mergeAndCacheActivities(newActivities) {
-    const existing = this.getCachedActivities() || [];
+  async mergeAndCacheActivities(newActivities) {
+    const existing = await this.getCachedActivities() || [];
     const existingIds = new Set(existing.map(a => a.id));
     const merged = [...existing, ...newActivities.filter(a => !existingIds.has(a.id))];
-    this.cacheActivities(merged);
+    await this.cacheActivities(merged);
     return merged;
   }
 
   /**
    * Clear cached activities
    */
-  clearCache() {
-    localStorage.removeItem(this.storageKey);
+  async clearCache() {
+    try {
+      const db = await this._getDB();
+      await idbDelete(db, CACHE_KEY);
+      localStorage.removeItem(META_KEY);
+    } catch (e) {
+      console.error('Failed to clear cache:', e);
+    }
   }
 
   /**
@@ -201,7 +261,7 @@ export class StravaAPI {
   /**
    * Download activities as JSON file
    */
-  downloadActivitiesJSON(activities) {
+  async downloadActivitiesJSON(activities) {
     const dataStr = JSON.stringify(activities, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

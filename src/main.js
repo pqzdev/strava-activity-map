@@ -308,11 +308,11 @@ function showOnboarding() {
 }
 
 // Load cached activities
-function loadCachedActivities() {
+async function loadCachedActivities() {
   try {
     loadingEl.classList.remove('hidden');
 
-    activities = api.getCachedActivities();
+    activities = await api.getCachedActivities();
 
     if (!activities || activities.length === 0) {
       throw new Error('No cached activities found');
@@ -1382,10 +1382,10 @@ logoutBtn.addEventListener('click', () => {
 });
 
 // Logout confirmation function (global for onclick handler)
-window.confirmLogout = () => {
+window.confirmLogout = async () => {
   // Clear all auth and cache data
-  stravaAuth.clearAll();
-  stravaAPI.clearCache();
+  auth.clearAll();
+  await api.clearCache();
 
   // Hide confirmation popup
   document.getElementById('logout-confirmation-popup').classList.remove('active');

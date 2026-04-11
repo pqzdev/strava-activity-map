@@ -454,7 +454,7 @@ export class OnboardingUI {
   /**
    * Initialize step 5 (fetch activities)
    */
-  initializeStep5() {
+  async initializeStep5() {
     // Show athlete info
     const athlete = this.auth.getAthlete();
     const scope = sessionStorage.getItem(this.auth.storageKeys.scope);
@@ -470,7 +470,7 @@ export class OnboardingUI {
     }
 
     const optionsEl = document.getElementById('fetch-options');
-    const cacheInfo = this.api.getCacheInfo();
+    const cacheInfo = await this.api.getCacheInfo();
 
     if (cacheInfo) {
       const fromStr = this._formatDate(cacheInfo.minDate);
@@ -514,8 +514,8 @@ export class OnboardingUI {
   /**
    * Use cached activities
    */
-  useCachedActivities() {
-    const activities = this.api.getCachedActivities();
+  async useCachedActivities() {
+    const activities = await this.api.getCachedActivities();
     if (activities) {
       this.complete(activities);
     }
@@ -525,7 +525,7 @@ export class OnboardingUI {
    * Fetch only new activities (since last cached date) and merge with cache
    */
   async fetchNewActivities() {
-    const cacheInfo = this.api.getCacheInfo();
+    const cacheInfo = await this.api.getCacheInfo();
     if (!cacheInfo || !cacheInfo.maxDate) return;
 
     // Start from beginning of the last cached day to catch same-day uploads
@@ -543,10 +543,10 @@ export class OnboardingUI {
    * Fetch all activities (clears cache first)
    */
   async fetchAllActivities() {
-    this.api.clearCache();
+    await this.api.clearCache();
     await this._doFetch(async (onProgress) => {
       const activities = await this.api.fetchAllActivities(onProgress);
-      this.api.cacheActivities(activities);
+      await this.api.cacheActivities(activities);
       return activities;
     });
   }
@@ -583,10 +583,10 @@ export class OnboardingUI {
   /**
    * Start over
    */
-  startOver() {
+  async startOver() {
     if (confirm('This will clear all your data and start over. Continue?')) {
       this.auth.clearAll();
-      this.api.clearCache();
+      await this.api.clearCache();
       this.showStep(1);
     }
   }
