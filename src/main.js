@@ -343,8 +343,14 @@ function handleActivitiesLoaded(loadedActivities) {
   // Populate activity type filter
   populateActivityTypes();
 
-  // Initialize date filter with full range
+  // Initialize date filter with full range, then apply any URL-restored values
   initializeDateFilter();
+  if (window.pendingDateFilterRestore) {
+    const { start, end } = window.pendingDateFilterRestore;
+    if (start) filterStartDate.value = start;
+    if (end) filterEndDate.value = end;
+    delete window.pendingDateFilterRestore;
+  }
 
   // Populate color schemes
   populateColorSchemes();
@@ -680,6 +686,8 @@ function handleDateFilterChange() {
   } else {
     renderActivities();
   }
+
+  scheduleURLUpdate();
 }
 
 // Handle activity type checkbox changes
@@ -1751,6 +1759,14 @@ function encodeStateToURL() {
     params.set('types', selectedTypes.join(','));
   }
 
+  // Date filter (only store if inputs exist and have values)
+  if (filterStartDate && filterStartDate.value) {
+    params.set('filterStart', filterStartDate.value);
+  }
+  if (filterEndDate && filterEndDate.value) {
+    params.set('filterEnd', filterEndDate.value);
+  }
+
   // GIF export settings
   params.set('gifWidth', exportWidth.value);
   params.set('gifHeight', exportHeight.value);
@@ -1887,6 +1903,15 @@ function restoreStateFromURL() {
         dateFormatSelect.value = format;
       }
     }
+  }
+
+  // Date filter (applied after initializeDateFilter runs)
+  if (params.has('filterStart') || params.has('filterEnd')) {
+    window.pendingDateFilterRestore = {
+      start: params.get('filterStart') || null,
+      end: params.get('filterEnd') || null
+    };
+    stateRestored = true;
   }
 
   // Animation time
