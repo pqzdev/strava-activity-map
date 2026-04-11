@@ -848,6 +848,13 @@ function initializeAnimation() {
   updateTimeDisplay(animationController.currentTime);
   updateTimelineSlider();
 
+  // Sync export date range to match the filtered activity range
+  if (animationController.startTime && animationController.endTime) {
+    exportStartDate.value = formatDateForInput(animationController.startTime);
+    exportEndDate.value = formatDateForInput(animationController.endTime);
+    updateGifSizeEstimate();
+  }
+
   // Initialize GIF exporter
   gifExporter = new GifExporter(animationController, map);
 
