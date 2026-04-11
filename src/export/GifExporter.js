@@ -495,19 +495,24 @@ export class GifExporter {
       );
     }
 
-    if (activityDates.length <= maxFrames) {
-      // Fewer (or equal) unique dates than frames — use every date once
-      return activityDates;
+    // Always prepend an empty frame at startDate (before any activities)
+    const emptyFrame = new Date(startDate);
+    emptyFrame.setHours(0, 0, 0, 0);
+
+    if (activityDates.length <= maxFrames - 1) {
+      // Fits within budget — use every date once after the empty frame
+      return [emptyFrame, ...activityDates];
     }
 
-    // More dates than frames — sample evenly, first → last, no duplicates
+    // More dates than budget — sample evenly from activityDates, then prepend empty frame
+    const budget = maxFrames - 1;
     const sampled = [];
-    for (let i = 0; i < maxFrames; i++) {
-      const progress = i / (maxFrames - 1);
+    for (let i = 0; i < budget; i++) {
+      const progress = i / (budget - 1);
       const idx = Math.round(progress * (activityDates.length - 1));
       sampled.push(activityDates[idx]);
     }
-    return sampled;
+    return [emptyFrame, ...sampled];
   }
 
   /**
