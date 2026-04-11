@@ -518,17 +518,15 @@ export class GifExporter {
       );
     }
 
-    // Map frames to activity dates - each frame shows progress through activity days
-    // This skips periods with no activities
+    // Map frames to activity dates, sampling evenly across all days.
+    // Use (N-1) as the denominator so frame 0 → first day and
+    // frame (frameCount-1) → last day, with no saturation at the end.
+    const n = activityDates.length;
     const frameTimes = [];
 
     for (let i = 0; i < frameCount; i++) {
-      // Calculate which activity day this frame corresponds to
-      const progress = i / (frameCount - 1 || 1);
-      const dateIndex = Math.min(
-        Math.floor(progress * activityDates.length),
-        activityDates.length - 1
-      );
+      const progress = i / (frameCount - 1 || 1); // 0 → 1 inclusive
+      const dateIndex = Math.round(progress * (n - 1));
       frameTimes.push(activityDates[dateIndex]);
     }
 
