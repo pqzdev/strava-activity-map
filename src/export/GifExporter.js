@@ -105,7 +105,6 @@ export class GifExporter {
       // This highlights the most common paths through overlapping
       // We draw ALL activities directly, bypassing the maxVisibleActivities limit
       const finalCanvas = await this._captureHeatmapFrame(width, height, baseMapCanvas, exportBounds, endDate, dateOverlay);
-      frames.push(finalCanvas);
       this._updateProgress(50, `Captured final heatmap frame`);
 
       // Restore animation state
@@ -114,9 +113,9 @@ export class GifExporter {
         this.animationController.play();
       }
 
-      // Create GIF
+      // Create GIF — final frame held for 1 second
       this._updateProgress(50, 'Encoding GIF...');
-      const gifBlob = await this._encodeGif(frames, fps, quality, width, height);
+      const gifBlob = await this._encodeGif(frames, fps, quality, width, height, finalCanvas);
 
       // Complete
       this._updateProgress(100, 'Complete!');
@@ -539,7 +538,7 @@ export class GifExporter {
   /**
    * Encode frames as GIF
    */
-  _encodeGif(canvases, fps, quality, width, height) {
+  _encodeGif(canvases, fps, quality, width, height, finalCanvas = null) {
     return new Promise((resolve, reject) => {
       try {
         const gif = new GIF({
@@ -558,6 +557,11 @@ export class GifExporter {
           console.log(`Adding frame ${index + 1}/${canvases.length}`);
           gif.addFrame(canvas, { delay: frameDelay, copy: true });
         });
+
+        // Add final frame held for 1 second
+        if (finalCanvas) {
+          gif.addFrame(finalCanvas, { delay: 1000, copy: true });
+        }
 
         console.log('All frames added, starting render...');
 
