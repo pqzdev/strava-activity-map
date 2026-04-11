@@ -83,7 +83,6 @@ export class GifExporter {
       // Capture frames using calculated times (skips empty periods)
       for (let i = 0; i < frameTimes.length; i++) {
         const currentTime = frameTimes[i];
-        const isLastFrame = i === frameTimes.length - 1;
 
         // Seek animation to this time (in background)
         this.animationController.seek(currentTime);
@@ -93,8 +92,7 @@ export class GifExporter {
 
         // Capture frame (polylines only, then composite with base map)
         const canvas = await this._captureMapCanvas(width, height, baseMapCanvas, exportBounds, false, currentTime, dateOverlay);
-        // Last animation frame holds for 1 second to transition cleanly into the heatmap
-        frames.push({ canvas, delay: isLastFrame ? 1000 : frameDelayMs });
+        frames.push({ canvas, delay: frameDelayMs });
 
         // Update progress (5-50% for frame capture)
         const progress = 5 + ((i + 1) / frameTimes.length) * 45;
@@ -102,9 +100,9 @@ export class GifExporter {
       }
 
       // Capture final "heatmap" frame showing all routes with equal opacity
-      // This highlights the most common paths through overlapping
-      // We draw ALL activities directly, bypassing the maxVisibleActivities limit
+      // Push directly into frames with a 1-second hold
       const finalCanvas = await this._captureHeatmapFrame(width, height, baseMapCanvas, exportBounds, endDate, dateOverlay);
+      frames.push({ canvas: finalCanvas, delay: 1000 });
       this._updateProgress(50, `Captured final heatmap frame`);
 
       // Restore animation state
@@ -113,9 +111,9 @@ export class GifExporter {
         this.animationController.play();
       }
 
-      // Create GIF — final frame held for 1 second
+      // Create GIF
       this._updateProgress(50, 'Encoding GIF...');
-      const gifBlob = await this._encodeGif(frames, quality, width, height, finalCanvas);
+      const gifBlob = await this._encodeGif(frames, quality, width, height);
 
       // Complete
       this._updateProgress(100, 'Complete!');
@@ -543,7 +541,7 @@ export class GifExporter {
   /**
    * Encode frames as GIF
    */
-  _encodeGif(frames, quality, width, height, finalCanvas = null) {
+  _encodeGif(frames, quality, width, height) {
     return new Promise((resolve, reject) => {
       try {
         const gif = new GIF({
@@ -554,18 +552,13 @@ export class GifExporter {
           workerScript: '/gif.worker.js'
         });
 
-        console.log('GIF encoder created, adding frames...');
+        console.log(`GIF encoder created, adding ${frames.length} frames...`);
 
         // Add frames — each carries its own delay
         frames.forEach(({ canvas, delay }, index) => {
           console.log(`Adding frame ${index + 1}/${frames.length} (delay ${delay}ms)`);
           gif.addFrame(canvas, { delay, copy: true });
         });
-
-        // Add final frame held for 1 second
-        if (finalCanvas) {
-          gif.addFrame(finalCanvas, { delay: 1000, copy: true });
-        }
 
         console.log('All frames added, starting render...');
 
