@@ -804,6 +804,13 @@
         </div>
       </div>
 
+      <div class="control-group">
+        <div class="date-overlay-checkbox">
+          <input type="checkbox" id="include-heatmap-frame" checked>
+          <label for="include-heatmap-frame">Include final heatmap frame</label>
+        </div>
+      </div>
+
       <div id="size-estimate" style="padding: 10px; background: #f0f9ff; border: 1px solid #0066cc; border-radius: 4px; margin-top: 15px; text-align: center;">
         <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Estimated Size</div>
         <div style="font-size: 18px; font-weight: 600; color: #0066cc;" id="size-estimate-value">~15 MB</div>
@@ -816,20 +823,8 @@
         <div style="font-size: 12px; text-align: center; color: #666; margin-bottom: 10px;" id="export-status">Preparing...</div>
       </div>
 
-      <div id="export-complete" style="display: none; margin-bottom: 10px;">
-        <div style="padding: 10px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; text-align: center;">
-          <div style="color: #155724; font-weight: 600; margin-bottom: 5px;">Export Complete!</div>
-          <a href="#" id="download-link" download style="color: #2196F3; text-decoration: none; font-weight: 600;">
-            Click here to download your GIF
-          </a>
-        </div>
-      </div>
-
-      <div style="display: flex; gap: 10px; align-items: center; margin-top: 15px;">
-        <button id="export-btn" style="flex: 1;">Produce GIF</button>
-        <button id="save-gif-btn" style="display: none; background: #2196F3; flex: 1; justify-content: center; align-items: center; gap: 8px;">
-          <i class="fas fa-download"></i> Download
-        </button>
+      <div style="margin-top: 15px;">
+        <button id="export-btn" style="width: 100%;">Create GIF</button>
       </div>
     </details>
 

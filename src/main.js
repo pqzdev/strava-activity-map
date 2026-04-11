@@ -221,7 +221,6 @@ const timeDisplay = document.getElementById('time-display');
 // Export controls
 const exportControlsEl = document.getElementById('export-controls');
 const exportBtn = document.getElementById('export-btn');
-const saveGifBtn = document.getElementById('save-gif-btn');
 const exportStartDate = document.getElementById('export-start-date');
 const exportEndDate = document.getElementById('export-end-date');
 const exportDuration = document.getElementById('export-duration');
@@ -229,6 +228,7 @@ const exportWidth = document.getElementById('export-width');
 const exportHeight = document.getElementById('export-height');
 const exportFps = document.getElementById('export-fps');
 const includeDateOverlay = document.getElementById('include-date-overlay');
+const includeHeatmapFrame = document.getElementById('include-heatmap-frame');
 const dateCornerSelector = document.getElementById('date-corner-selector');
 const dateFormatSelect = document.getElementById('date-format-select');
 const datePreviewOverlay = document.getElementById('date-preview-overlay');
@@ -236,11 +236,7 @@ const sizeEstimateValue = document.getElementById('size-estimate-value');
 const exportProgress = document.getElementById('export-progress');
 const progressFill = document.getElementById('progress-fill');
 const exportStatus = document.getElementById('export-status');
-const exportComplete = document.getElementById('export-complete');
-const downloadLink = document.getElementById('download-link');
 
-// Store the last exported GIF blob
-let lastExportedGif = null;
 
 // Main initialization
 async function init() {
@@ -1647,14 +1643,10 @@ exportBtn.addEventListener('click', async () => {
       return;
     }
 
-    // Hide previous download link
-    exportComplete.style.display = 'none';
-
     // Show progress
     exportProgress.style.display = 'block';
     exportBtn.disabled = true;
-    exportBtn.textContent = 'Producing...';
-    saveGifBtn.style.display = 'none'; // Hide download button until new GIF is ready
+    exportBtn.textContent = 'Creating...';
 
     // Set up progress callback
     gifExporter.onProgress = (percent, message) => {
@@ -1678,26 +1670,18 @@ exportBtn.addEventListener('click', async () => {
         corner: getSelectedDateCorner(),
         color: getDominantActivityColor(),
         format: dateFormatSelect.value
-      } : { enabled: false }
+      } : { enabled: false },
+      includeHeatmapFrame: includeHeatmapFrame.checked
     });
 
-    // Store the blob and filename
-    lastExportedGif = {
-      blob,
-      filename: `strava-activities-${formatDateForInput(startDate)}-to-${formatDateForInput(endDate)}.gif`
-    };
-
-    // Hide progress, show Save button
+    // Hide progress, re-enable button
     exportProgress.style.display = 'none';
-    exportComplete.style.display = 'none'; // Hide old download link
-
-    // Make produce button grey but keep it active
     exportBtn.disabled = false;
-    exportBtn.textContent = 'Produce GIF';
-    exportBtn.style.background = '#999999';
+    exportBtn.textContent = 'Create GIF';
 
-    // Show Save GIF button
-    saveGifBtn.style.display = 'flex';
+    // Open GIF in a new tab
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
 
     console.log(`GIF ready! Size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
 
@@ -1705,28 +1689,9 @@ exportBtn.addEventListener('click', async () => {
     console.error('Export failed:', error);
     alert(`Export failed: ${error.message}`);
     exportProgress.style.display = 'none';
-    saveGifBtn.style.display = 'none'; // Hide download button on error
     exportBtn.disabled = false;
-    exportBtn.textContent = 'Produce GIF';
-    exportBtn.style.background = ''; // Reset background
+    exportBtn.textContent = 'Create GIF';
   }
-});
-
-// Save GIF button click handler
-saveGifBtn.addEventListener('click', () => {
-  if (!lastExportedGif) return;
-
-  // Create download link and trigger download
-  const url = URL.createObjectURL(lastExportedGif.blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = lastExportedGif.filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  console.log(`Downloaded: ${lastExportedGif.filename}`);
 });
 
 // ============================================================================

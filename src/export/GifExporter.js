@@ -31,7 +31,8 @@ export class GifExporter {
       fps = 15,
       quality = 10, // 1-30, lower is better quality but slower
       captureBox = null, // { left, top, width, height } in pixels
-      dateOverlay = { enabled: false } // { enabled, corner, color }
+      dateOverlay = { enabled: false }, // { enabled, corner, color }
+      includeHeatmapFrame = true
     } = options;
 
     console.log('Starting export with options:', { startDate, endDate, duration, width, height, fps, quality });
@@ -94,11 +95,12 @@ export class GifExporter {
         this._updateProgress(progress, `Captured frame ${i + 1}/${frameTimes.length}`);
       }
 
-      // Capture final "heatmap" frame showing all routes with equal opacity
-      // Push directly into frames with a 1-second hold
-      const finalCanvas = await this._captureHeatmapFrame(width, height, baseMapCanvas, exportBounds, endDate, dateOverlay);
-      frames.push({ canvas: finalCanvas, delay: 1000 });
-      this._updateProgress(50, `Captured final heatmap frame`);
+      // Optionally capture final "heatmap" frame showing all routes with equal opacity
+      if (includeHeatmapFrame) {
+        const finalCanvas = await this._captureHeatmapFrame(width, height, baseMapCanvas, exportBounds, endDate, dateOverlay);
+        frames.push({ canvas: finalCanvas, delay: 1000 });
+        this._updateProgress(50, `Captured final heatmap frame`);
+      }
 
       // Restore animation state
       this.animationController.seek(originalTime);
