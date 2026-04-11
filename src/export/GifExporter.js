@@ -45,7 +45,7 @@ export class GifExporter {
 
       // Calculate frame count based on activity days, not total time
       // Distribute frames across days with activities
-      const frameCount = Math.floor(duration * fps);
+      const frameCount = Math.floor((duration - 1) * fps);
       const frames = [];
 
       // If no activities, fall back to standard behavior
